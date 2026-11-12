@@ -31,6 +31,7 @@ yarn-error.log*
 
 # env files
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -39,5 +40,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# local tool config
-.claude/
+
+# Shared local database, secrets and browser test artifacts
+/data/
+/test-results/
+/playwright-report/
+
+AGENTS.md

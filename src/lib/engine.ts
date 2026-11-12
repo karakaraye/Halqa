@@ -1,4 +1,5 @@
-import { Case, Escalation, StepId, DelayReason, PathwayId, Role, Person } from '@/types/halqa';
+import { isEvidenceClosure } from '@/domain/closure';
+import { Case, Directory, Escalation, StepId, DelayReason, PathwayId, Role, Person } from '@/types/halqa';
 import { PATHWAYS, URGENCY_FACTOR, HOUR, DAY, StepDef, PEOPLE, SPECIALIST_SERVICES, ACTING_AS } from './pathways';
 
 let idCounter = 0;
@@ -12,12 +13,12 @@ export function currentStep(c: Case): StepDef | null {
   return null;
 }
 
-/** The real person acting on this case for a given role (uses the case team where possible). */
+/** Person acting for a role when no signed-in user is supplied: the case team first, then the role default. */
 export function actorFor(c: Case, role: Role): Person {
   if (role === 'SPECIALIST') {
     if (c.team.SPECIALIST) return c.team.SPECIALIST;
     const svc = SPECIALIST_SERVICES.find((x) => x.facility === c.referral?.facility) ?? SPECIALIST_SERVICES.find((x) => x.pathway === c.pathwayId);
-    return svc ? PEOPLE[svc.specialist] : ACTING_AS.SPECIALIST;
+    return (svc && PEOPLE[svc.specialist]) || ACTING_AS.SPECIALIST;
   }
   if (role === 'PCP') return c.team.PCP ?? ACTING_AS.PCP;
   if (role === 'NAVIGATOR') return c.team.NAVIGATOR ?? ACTING_AS.NAVIGATOR;
@@ -77,10 +78,10 @@ export function stepOwner(c: Case, step: StepDef | null): { name: string; detail
   }
   if (step.ownerRole === 'SPECIALIST') {
     if (c.team.SPECIALIST) return { name: c.team.SPECIALIST.name, detail: c.team.SPECIALIST.org, unassigned: false };
-    if (c.referral && (c.referral.status === 'SENT')) return { name: `${c.referral.facility}`, detail: 'Referral intake queue', unassigned: false };
+    if (c.referral && (c.referral.status === 'SENT')) return { name: `${c.referral.facility}`, detail: 'Waiting for the referral to be answered', unassigned: false };
     if (c.referral && (c.referral.status === 'REJECTED' || c.referral.status === 'INFO_REQUESTED') && c.team.PCP)
-      return { name: c.team.PCP.name, detail: 'Referral returned — must re-route', unassigned: false };
-    return { name: 'Unassigned', detail: 'No receiving service', unassigned: true };
+      return { name: c.team.PCP.name, detail: 'The referral came back and needs a new service', unassigned: false };
+    return { name: 'Unassigned', detail: 'No receiving service chosen yet', unassigned: true };
   }
   const p = c.team[step.ownerRole as 'NAVIGATOR' | 'PCP'];
   if (p) return { name: p.name, detail: p.org, unassigned: false };
@@ -113,7 +114,7 @@ export function caseStatus(c: Case, now: number): CaseStatus {
   };
 }
 
-// ── Work items: everything a human needs to do on a case ──────
+// Work items: everything a person needs to do on a case.
 export type ActionKind =
   | 'OVERDUE' | 'UNASSIGNED' | 'REJECTED' | 'ESCALATED' | 'CALLBACK' | 'LOW_UNDERSTANDING'
   | 'UNREACHABLE' | 'DUE_SOON' | 'TRANSFER_PENDING' | 'APPROVAL' | 'PATIENT_MESSAGE' | 'ECONSULT';
@@ -124,24 +125,24 @@ export function actionItems(c: Case, now: number): ActionItem[] {
   if (isClosed(c)) return [];
   const s = caseStatus(c, now);
   const out: ActionItem[] = [];
-  if (c.closure?.status === 'PENDING_APPROVAL') out.push({ kind: 'APPROVAL', text: 'Exception closure awaiting 2nd approver', severity: 2 });
-  if (s.openEscalations.length) out.push({ kind: 'ESCALATED', text: `Level ${s.maxLevel} escalation open`, severity: s.maxLevel >= 2 ? 3 : 2 });
-  if (s.state === 'OVERDUE') out.push({ kind: 'OVERDUE', text: `${s.step?.label} overdue by ${fmtDuration(-s.remainingMs)}`, severity: 3 });
-  if (s.unassigned) out.push({ kind: 'UNASSIGNED', text: 'No accountable owner for current step', severity: 3 });
+  if (c.closure?.status === 'PENDING_APPROVAL') out.push({ kind: 'APPROVAL', text: 'Closing without a test result is waiting for a second person to check it', severity: 2 });
+  if (s.openEscalations.length) out.push({ kind: 'ESCALATED', text: s.maxLevel >= 2 ? 'Raised with the clinical lead' : 'An alert is open', severity: s.maxLevel >= 2 ? 3 : 2 });
+  if (s.state === 'OVERDUE') out.push({ kind: 'OVERDUE', text: `${STEP_PHRASE[s.step!.id]} is ${plainDuration(-s.remainingMs)} late`, severity: 3 });
+  if (s.unassigned) out.push({ kind: 'UNASSIGNED', text: 'No one is looking after this step', severity: 3 });
   if (c.referral && (c.referral.status === 'REJECTED' || c.referral.status === 'INFO_REQUESTED'))
-    out.push({ kind: 'REJECTED', text: c.referral.status === 'REJECTED' ? `Referral rejected: ${c.referral.rejectReason}` : 'Specialist requested more information', severity: 2 });
-  if (c.callbackRequestedAt && !c.callbackDoneAt) out.push({ kind: 'CALLBACK', text: 'Patient requested a call back', severity: 2 });
+    out.push({ kind: 'REJECTED', text: c.referral.status === 'REJECTED' ? `The referral was sent back: ${c.referral.rejectReason}` : 'The specialist asked for more information', severity: 2 });
+  if (c.callbackRequestedAt && !c.callbackDoneAt) out.push({ kind: 'CALLBACK', text: 'Patient asked for a call back', severity: 2 });
   if (c.feedback && (!c.feedback.understoodQ1 || !c.feedback.understoodQ2 || c.feedback.confidence <= 2) &&
     !c.escalations.some((e) => e.ruleId === 'R6_LOW_UNDERSTANDING' && e.resolvedAt))
-    out.push({ kind: 'LOW_UNDERSTANDING', text: 'Teach-back shows patient may not understand', severity: 2 });
+    out.push({ kind: 'LOW_UNDERSTANDING', text: 'Patient may not have understood the result', severity: 2 });
   const failed = c.notifications.filter((n) => n.status === 'FAILED' || n.status === 'NO_ANSWER').length;
-  if (s.step?.id === 'NOTIFY' && failed > 0) out.push({ kind: 'UNREACHABLE', text: `${failed} failed contact attempt${failed > 1 ? 's' : ''}`, severity: failed >= 3 ? 3 : 2 });
-  if (c.pendingTransfer) out.push({ kind: 'TRANSFER_PENDING', text: `Accountability transfer to ${c.pendingTransfer.to.name} awaiting acceptance`, severity: 1 });
+  if (s.step?.id === 'NOTIFY' && failed > 0) out.push({ kind: 'UNREACHABLE', text: `Could not reach the patient (${tries(failed)})`, severity: failed >= 3 ? 3 : 2 });
+  if (c.pendingTransfer) out.push({ kind: 'TRANSFER_PENDING', text: `Waiting for ${c.pendingTransfer.to.name} to take over this case`, severity: 1 });
   const lastPatientMsg = [...c.messages].reverse().find((m) => m.thread === 'PATIENT');
-  if (lastPatientMsg && lastPatientMsg.fromRole === 'PATIENT') out.push({ kind: 'PATIENT_MESSAGE', text: 'Unanswered patient message', severity: 1 });
+  if (lastPatientMsg && lastPatientMsg.fromRole === 'PATIENT') out.push({ kind: 'PATIENT_MESSAGE', text: 'The patient is waiting for a reply', severity: 1 });
   const lastEc = [...c.messages].reverse().find((m) => m.thread === 'ECONSULT');
-  if (lastEc && lastEc.fromRole === 'PCP') out.push({ kind: 'ECONSULT', text: 'E-consult awaiting specialist reply', severity: 1 });
-  if (s.state === 'DUE_SOON') out.push({ kind: 'DUE_SOON', text: `${s.step?.label} due in ${fmtDuration(s.remainingMs)}`, severity: 1 });
+  if (lastEc && lastEc.fromRole === 'PCP') out.push({ kind: 'ECONSULT', text: 'A question for the specialist is waiting for a reply', severity: 1 });
+  if (s.state === 'DUE_SOON') out.push({ kind: 'DUE_SOON', text: `${STEP_PHRASE[s.step!.id]} is due in ${plainDuration(s.remainingMs)}`, severity: 1 });
   return out.sort((a, b) => b.severity - a.severity);
 }
 
@@ -153,44 +154,92 @@ export function priorityScore(c: Case, now: number) {
   return sev * 1000 + urg * 100 + Math.max(0, Math.min(99, -s.remainingMs / HOUR));
 }
 
-// ── Escalation engine — runs on every clock tick ──────────────
-// It only ALERTS humans. It never completes clinical steps or closes cases.
-export function runEngine(c: Case, now: number): { next: Case; created: Escalation[] } {
-  if (isClosed(c) || c.historical || c.closure?.status === 'PENDING_APPROVAL') return { next: c, created: [] };
+/** Each step as an everyday activity, for sentences shown to staff. */
+export const STEP_PHRASE: Record<StepId, string> = {
+  NOTIFY: 'Talking to the patient',
+  ACK: 'Checking the patient understood',
+  CONSULT: 'The talk between doctor and patient',
+  CONFIRM_TEST: 'The repeat test',
+  REFER: 'Sending the referral',
+  ACCEPT: 'The answer to the referral',
+  BOOK: 'Booking the appointment',
+  ATTEND: 'The test appointment',
+  OUTCOME: 'Recording the test result',
+  CARE_PLAN: 'Starting treatment or follow-up',
+  CLOSE: 'Signing off the case',
+};
+
+export const LEAD_FALLBACK = 'Clinical lead';
+const COORDINATION_LEAD = 'Care coordination lead';
+const APPROVAL_TARGET_HOURS = 72;
+
+/** Name of the network's clinical lead, who receives the serious alerts. */
+export function leadName(directory?: Directory) {
+  return directory?.people.find((p) => p.role === 'LEAD')?.name ?? LEAD_FALLBACK;
+}
+
+const tries = (n: number) => `${n} ${n === 1 ? 'try' : 'tries'}`;
+const lowerFirst = (text: string) => text.charAt(0).toLowerCase() + text.slice(1);
+
+/**
+ * Checks one open case against the alert rules and returns any new alerts.
+ * It only tells people that something needs attention. It never completes a
+ * step or closes a case.
+ */
+export function runEngine(c: Case, now: number, directory?: Directory): { next: Case; created: Escalation[] } {
+  if (isClosed(c) || c.historical) return { next: c, created: [] };
   const step = currentStep(c);
   if (!step) return { next: c, created: [] };
   const start = stepStart(c, step);
   const sla = slaMs(c, step);
   const owner = stepOwner(c, step);
+  const lead = leadName(directory);
+  const phrase = STEP_PHRASE[step.id];
   const created: Escalation[] = [];
   const has = (ruleId: string) => c.escalations.some((e) => e.ruleId === ruleId && e.stepId === step.id && e.at >= start);
   const add = (ruleId: string, level: 1 | 2 | 3, reason: string, to: string, at: number) => {
     if (has(ruleId) || created.some((e) => e.ruleId === ruleId)) return;
     created.push({ id: uid('esc'), at, level, ruleId, reason, to, stepId: step.id });
   };
-  if (now > start + sla) add('R1_OVERDUE', 1, `${step.label} passed its ${fmtDuration(sla)} target`, owner.unassigned ? 'Care Coordination Lead (no owner)' : `${owner.name} + Coordination Lead`, start + sla);
-  if (now > start + 2 * sla || (c.urgency === 'CRITICAL' && now > start + sla))
-    add('R2_OVERDUE_2X', 2, c.urgency === 'CRITICAL' && now <= start + 2 * sla
-      ? `CRITICAL case overdue at “${step.label}”` : `${step.label} at 2× target`, PEOPLE.lead_fatima.name,
-      c.urgency === 'CRITICAL' ? start + sla : start + 2 * sla);
-  if (owner.unassigned && now > start + 4 * HOUR) add('R3_UNASSIGNED', 1, `No owner for “${step.label}”`, 'Care Coordination Lead', start + 4 * HOUR);
+
+  // A request to close early has its own deadline, separate from the step deadlines.
+  const approvalDue = (c.closure?.signedAt ?? 0) + APPROVAL_TARGET_HOURS * HOUR;
+  if (c.closure?.status === 'PENDING_APPROVAL' && now > approvalDue)
+    add('R8_APPROVAL_OVERDUE', 2, 'Closing without a test result is waiting for a second person to check it', lead, approvalDue);
+
+  if (now > start + sla)
+    add('R1_OVERDUE', 1, `${phrase} is late. It should take no more than ${plainDuration(sla)}.`,
+      owner.unassigned ? COORDINATION_LEAD : `${owner.name} and the ${lowerFirst(COORDINATION_LEAD)}`, start + sla);
+
+  const critical = c.urgency === 'CRITICAL';
+  if (now > start + 2 * sla || (critical && now > start + sla))
+    add('R2_OVERDUE_2X', 2,
+      critical && now <= start + 2 * sla
+        ? `Urgent case: ${lowerFirst(phrase)} is late`
+        : `${phrase} has taken more than twice the time allowed`,
+      lead, critical ? start + sla : start + 2 * sla);
+
+  if (owner.unassigned && now > start + 4 * HOUR)
+    add('R3_UNASSIGNED', 1, 'No one is looking after this step', COORDINATION_LEAD, start + 4 * HOUR);
+
   if (step.id === 'NOTIFY') {
     const failed = c.notifications.filter((n) => n.status === 'FAILED' || n.status === 'NO_ANSWER');
-    if (failed.length >= 3 || (c.urgency === 'CRITICAL' && failed.length >= 1))
-      add('R4_UNREACHABLE', 2, `Patient unreachable (${failed.length} failed attempt${failed.length > 1 ? 's' : ''})`, PEOPLE.lead_fatima.name, failed[failed.length - 1].at);
+    if (failed.length >= 3 || (critical && failed.length >= 1))
+      add('R4_UNREACHABLE', 2, `Could not reach the patient (${tries(failed.length)})`, lead, failed[failed.length - 1].at);
   }
+
   if (!created.length) return { next: c, created };
   return {
     next: {
       ...c,
       escalations: [...c.escalations, ...created],
-      audit: [...c.audit, ...created.map((e) => ({ at: e.at, actor: 'Halqa rules engine', action: `Level ${e.level} escalation → ${e.to}`, detail: e.reason, system: true }))],
+      audit: [...c.audit, ...created.map((e) => ({ at: e.at, actor: 'Halqa', action: `Alert sent to ${e.to}`, detail: e.reason, system: true }))],
     },
     created,
   };
 }
 
-// ── Formatting ────────────────────────────────────────────────
+// Formatting
 export function fmtDuration(ms: number) {
   const abs = Math.abs(ms);
   if (abs < HOUR) return `${Math.max(1, Math.round(abs / 60000))}m`;
@@ -198,14 +247,16 @@ export function fmtDuration(ms: number) {
   return `${(abs / DAY).toFixed(abs < 10 * DAY ? 1 : 0)}d`;
 }
 
-const dtf = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Dubai', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
-const df = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Dubai', day: '2-digit', month: 'short', year: 'numeric' });
-const wdf = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Dubai', weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
-export const fmtDateTime = (t: number) => dtf.format(new Date(t));
-export const fmtDate = (t: number) => df.format(new Date(t));
-export const fmtSlot = (t: number) => wdf.format(new Date(t));
+/** A length of time in whole words: "40 minutes", "6 hours", "3 days". */
+export function plainDuration(ms: number) {
+  const abs = Math.abs(ms);
+  const count = (n: number, unit: string) => `${n} ${unit}${n === 1 ? '' : 's'}`;
+  if (abs < HOUR) return count(Math.max(1, Math.round(abs / 60000)), 'minute');
+  if (abs < 2 * DAY) return count(Math.round(abs / HOUR), 'hour');
+  return count(Math.round(abs / DAY), 'day');
+}
 
-// ── Metrics (computed live from case data) ────────────────────
+// Measures, worked out from the case records each time they are asked for.
 export function median(xs: number[]) {
   if (!xs.length) return NaN;
   const s = [...xs].sort((a, b) => a - b);
@@ -262,7 +313,7 @@ export function computeMetrics(cases: Case[], now: number, filter?: PathwayId | 
   const attendedOrDna =cs.filter((c) => c.steps.ATTEND?.completedAt || (c.appointment?.dnaCount ?? 0) > 0);
   const attendFirstTime = attendedOrDna.filter((c) => c.steps.ATTEND?.completedAt && (c.appointment?.dnaCount ?? 0) === 0);
 
-  // SLA compliance across all completed steps
+  // Share of completed steps that met their time target.
   let met = 0, totalSteps = 0;
   const perStep: Record<string, { met: number; n: number; label: string }> = {};
   for (const c of cs) {
@@ -301,7 +352,7 @@ export function computeMetrics(cases: Case[], now: number, filter?: PathwayId | 
     total: cs.length,
     active: active.length,
     closed: closed.length,
-    closedWithEvidencePct: closed.length ? (100 * closed.filter((c) => c.closure?.evidenceRef && c.closure.signedLicence).length) / closed.length : 0,
+    closedWithEvidencePct: closed.length ? (100 * closed.filter(isEvidenceClosure).length) / closed.length : 0,
     medianHoursToNotify: hrs(cs.map((c) => timeTo(c, 'NOTIFY'))),
     medianHoursToAck: hrs(cs.map((c) => timeTo(c, 'ACK'))),
     medianDaysToConsult: days(cs.map((c) => timeTo(c, 'CONSULT'))),
@@ -339,12 +390,12 @@ export function computeMetrics(cases: Case[], now: number, filter?: PathwayId | 
 }
 
 export const DELAY_LABEL: Record<DelayReason, string> = {
-  UNREACHABLE: 'Patient unreachable',
-  DNA: 'Did not attend appointment',
-  REFERRAL_REJECTED: 'Referral rejected / re-routed',
-  CAPACITY: 'Specialist capacity',
-  PATIENT_DECLINED: 'Patient declined',
-  PATIENT_TRAVEL: 'Patient travelling / abroad',
-  INFO_MISSING: 'Missing clinical information',
-  LOW_UNDERSTANDING: 'Low understanding / anxiety',
+  UNREACHABLE: 'Could not reach the patient',
+  DNA: 'Patient missed the appointment',
+  REFERRAL_REJECTED: 'Referral was sent back',
+  CAPACITY: 'No appointment available in time',
+  PATIENT_DECLINED: 'Patient said no',
+  PATIENT_TRAVEL: 'Patient is away',
+  INFO_MISSING: 'Information was missing',
+  LOW_UNDERSTANDING: 'Patient did not understand the result',
 };

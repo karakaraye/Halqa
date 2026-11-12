@@ -1,4 +1,4 @@
-import { PathwayId, Role, StepId, Urgency, Person } from '@/types/halqa';
+import { PathwayId, Role, StepId, Urgency, Person, Service } from '@/types/halqa';
 
 export const HOUR = 3_600_000;
 export const DAY = 24 * HOUR;
@@ -36,8 +36,8 @@ const S = (id: StepId, label: string, ownerRole: Role, slaHours: number, hint: s
   id, label, ownerRole, slaHours, hint,
 });
 
-// NOTE: SLA values are illustrative defaults for the demo and are fully
-// configurable per programme / DoH standard.
+// Default time targets. Each programme should replace them with its own
+// agreed standards before use.
 const referralSteps = (test: string, attendDays: number): StepDef[] => [
   S('NOTIFY', 'Patient notified', 'NAVIGATOR', 24, 'Result communicated in preferred language & channel'),
   S('ACK', 'Understanding confirmed', 'PATIENT', 48, 'Patient acknowledges + teach-back check'),
@@ -55,7 +55,7 @@ export const PATHWAYS: Record<PathwayId, Pathway> = {
   CRC_FIT: {
     id: 'CRC_FIT',
     name: 'Colorectal cancer screening — positive FIT',
-    short: 'Colorectal (FIT+)',
+    short: 'Bowel screening',
     program: 'Colorectal Screening Programme',
     specialty: 'Gastroenterology',
     diagnosticTest: 'Colonoscopy',
@@ -66,7 +66,7 @@ export const PATHWAYS: Record<PathwayId, Pathway> = {
   BREAST_BIRADS: {
     id: 'BREAST_BIRADS',
     name: 'Breast cancer screening — BI-RADS 4/5 mammogram',
-    short: 'Breast (BI-RADS 4/5)',
+    short: 'Breast screening',
     program: 'Breast Screening Programme',
     specialty: 'Breast Imaging & Surgery',
     diagnosticTest: 'Core biopsy',
@@ -77,7 +77,7 @@ export const PATHWAYS: Record<PathwayId, Pathway> = {
   CERVICAL_HPV: {
     id: 'CERVICAL_HPV',
     name: 'Cervical screening — HPV 16/18 or high-grade cytology',
-    short: 'Cervical (HPV+/HSIL)',
+    short: 'Cervical screening',
     program: 'Cervical Screening Programme',
     specialty: 'Gynaecology (Colposcopy)',
     diagnosticTest: 'Colposcopy',
@@ -88,7 +88,7 @@ export const PATHWAYS: Record<PathwayId, Pathway> = {
   DIABETES_HBA1C: {
     id: 'DIABETES_HBA1C',
     name: 'Cardiometabolic screening — HbA1c in diabetes range',
-    short: 'Diabetes (HbA1c≥6.5%)',
+    short: 'Diabetes check',
     program: 'Cardiometabolic Screening Programme',
     specialty: 'Endocrinology / Primary Care',
     diagnosticTest: 'Repeat HbA1c',
@@ -175,7 +175,9 @@ export const ESCALATION_RULES = [
   },
 ];
 
-// ── Directory of people & services in the demo network ────────
+// Staff and services of the local development workspace (npm run setup) and
+// the fallback directory for domain unit tests. The server reads the real
+// directory from the database.
 export const PEOPLE: Record<string, Person> = {
   nav_reem: { id: 'nav_reem', name: 'Reem Al Hosani', role: 'NAVIGATOR', org: 'Preventive Screening Hub' },
   nav_joseph: { id: 'nav_joseph', name: 'Joseph Mathew', role: 'NAVIGATOR', org: 'Preventive Screening Hub' },
@@ -189,7 +191,7 @@ export const PEOPLE: Record<string, Person> = {
   lead_fatima: { id: 'lead_fatima', name: 'Dr. Fatima Al Kaabi', role: 'LEAD', org: 'Screening Programme Governance', licence: 'DOH-SP-10021' },
 };
 
-export const SPECIALIST_SERVICES: { facility: string; specialty: string; pathway: PathwayId; specialist: string }[] = [
+export const SPECIALIST_SERVICES: Service[] = [
   { facility: 'City Hospital — Gastroenterology', specialty: 'Gastroenterology', pathway: 'CRC_FIT', specialist: 'sp_tariq' },
   { facility: 'Regional Hospital — Endoscopy Unit', specialty: 'Gastroenterology', pathway: 'CRC_FIT', specialist: 'sp_tariq' },
   { facility: 'Women’s Health Centre — Breast Unit', specialty: 'Breast Imaging & Surgery', pathway: 'BREAST_BIRADS', specialist: 'sp_huda' },
@@ -211,23 +213,11 @@ export const STAFF_BY_ROLE: Record<Exclude<Role, 'PATIENT'>, Person[]> = {
   LEAD: [PEOPLE.lead_fatima],
 };
 
-/** Who the app is "acting as" for each role in the demo */
+/** Default person per role when the domain runs without a signed-in user. */
 export const ACTING_AS: Record<Role, Person> = {
   NAVIGATOR: PEOPLE.nav_reem,
   PCP: PEOPLE.pcp_mariam,
   SPECIALIST: PEOPLE.sp_tariq,
   LEAD: PEOPLE.lead_fatima,
   PATIENT: { id: 'patient', name: 'Patient', role: 'PATIENT', org: 'Patient app' },
-};
-
-// ── Illustrative baseline for before/after comparison ─────────
-// Replace with the programme's own audit data. These are placeholder
-// figures representative of fragmented, manual follow-up.
-export const BASELINE = {
-  medianHoursToNotify: 120,
-  medianDaysToDiagnostic: 62,
-  referralCompletionPct: 68,
-  documentedClosurePct: 41,
-  unknownStatusPct: 27,
-  patientConfidence: 2.9,
 };

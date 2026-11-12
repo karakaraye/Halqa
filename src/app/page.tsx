@@ -1,43 +1,51 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useSyncExternalStore } from 'react';
+import dynamic from 'next/dynamic';
 import { HalqaProvider, useHalqa } from '@/context/HalqaStore';
-import { Header, Toasts } from '@/components/Header';
-import { CommandCentre } from '@/components/CommandCentre';
-import { SpecialistInbox } from '@/components/SpecialistInbox';
-import { PatientApp } from '@/components/PatientApp';
-import { ImpactDashboard } from '@/components/ImpactDashboard';
-import { Governance } from '@/components/Governance';
-import { CaseDrawer } from '@/components/case/CaseDrawer';
-import { DemoGuide } from '@/components/DemoGuide';
+import { Shell, tabForView } from '@/components/design/Shell';
+import { Loading } from '@/components/design/primitives';
+import { StoreBanners } from '@/components/design/StoreBanners';
+import { MyWork } from '@/components/staff/MyWork';
+import { NotOnList } from '@/components/staff/NotOnList';
+import { ChangePasswordScreen } from '@/components/design/ChangePassword';
+
+// Screens load on demand so the sign-in route ships only the sign-in code.
+const loading = () => <Loading />;
+const CasePage = dynamic(() => import('@/components/staff/CasePage').then((m) => m.CasePage), { loading });
+const Referrals = dynamic(() => import('@/components/staff/Referrals').then((m) => m.Referrals), { loading });
+const Overview = dynamic(() => import('@/components/staff/Overview').then((m) => m.Overview), { loading });
+const Approvals = dynamic(() => import('@/components/staff/Approvals').then((m) => m.Approvals), { loading });
+const AccountsPage = dynamic(() => import('@/components/staff/AccountsPage').then((m) => m.AccountsPage), { loading });
+const PatientPortal = dynamic(() => import('@/components/patient/PatientPortal').then((m) => m.PatientPortal), {
+  loading: () => <div className="min-h-screen bg-slate-50 p-4"><Loading /></div>,
+});
 
 function App() {
-  const { s } = useHalqa();
+  const { s, user, notOnList } = useHalqa();
+  if (user.mustChangePassword) return <><StoreBanners /><ChangePasswordScreen /></>;
+  // The patient portal shows the store banners itself, in the patient's language.
+  if (user.person.role === 'PATIENT') return <PatientPortal />;
+  let screen: React.ReactNode;
+  if (s.selectedId) screen = <CasePage />;
+  else if (notOnList) screen = <NotOnList />;
+  else if (s.view === 'command') screen = <MyWork />;
+  else if (s.view === 'specialist') screen = <Referrals />;
+  else if (s.view === 'governance') screen = <Approvals />;
+  else if (s.view === 'accounts') screen = <AccountsPage />;
+  else screen = <Overview />; // 'impact', and 'patient' as fallback
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
-      <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 lg:px-6 py-5 pb-24">
-        {s.view === 'command' && <CommandCentre />}
-        {s.view === 'specialist' && <SpecialistInbox />}
-        {s.view === 'patient' && <PatientApp />}
-        {s.view === 'impact' && <ImpactDashboard />}
-        {s.view === 'governance' && <Governance />}
-      </main>
-      <footer className="border-t border-slate-200 bg-white py-3 text-center text-[11px] text-slate-500">
-        Halqa (حَلْقَة, “the loop”) · Prototype with simulated data only, no real patient information · FHIR R4–aligned
-      </footer>
-      <CaseDrawer />
-      <Toasts />
-      <DemoGuide />
-    </div>
+    <>
+      <StoreBanners />
+      <Shell active={tabForView(s.view)}>{screen}</Shell>
+    </>
   );
 }
 
 export default function Home() {
-  // Render client-side only: the demo runs on a simulated clock persisted in localStorage.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  if (!mounted) return <div className="min-h-screen grid place-items-center text-sm text-slate-400">Loading Halqa…</div>;
+  // The provider authenticates and loads the shared server workspace after mount.
+  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
+  if (!mounted) return <div className="min-h-screen grid place-items-center text-[16px] text-slate-500">Loading Halqa…</div>;
   return (
     <HalqaProvider>
       <App />

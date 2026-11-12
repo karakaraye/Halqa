@@ -1,8 +1,6 @@
-// ─────────────────────────────────────────────────────────────
-// Halqa domain model — one "Case" = one actionable screening result
-// followed from issuance to documented closure.
-// All times are epoch milliseconds on the simulation clock.
-// ─────────────────────────────────────────────────────────────
+// One Case is one screening result that needs follow-up, tracked from the
+// moment the lab issues it until a clinician signs it off.
+// All times are epoch milliseconds on the workspace clock.
 
 export type Lang = 'en' | 'ar' | 'hi' | 'ur';
 
@@ -42,10 +40,13 @@ export interface StepRecord {
 }
 
 export interface Notification {
+  /** Set for messages sent through the outbox; matches the outbox row id. */
+  id?: string;
   at: number;
   channel: Channel;
   lang: Lang;
-  status: 'DELIVERED' | 'READ' | 'FAILED' | 'NO_ANSWER' | 'REACHED';
+  /** QUEUED and SENT are in flight: the patient has not been told yet. */
+  status: 'QUEUED' | 'SENT' | 'DELIVERED' | 'READ' | 'FAILED' | 'NO_ANSWER' | 'REACHED';
   by: string;
 }
 
@@ -66,6 +67,20 @@ export interface Appointment {
   location: string;
   bookedBy: string;
   dnaCount: number;
+}
+
+/** A receiving service and the specialist who answers its referrals. */
+export interface Service {
+  facility: string;
+  specialty: string;
+  pathway: PathwayId;
+  specialist: string; // Person id
+}
+
+/** Staff and receiving services of one network, read from the database. */
+export interface Directory {
+  people: Person[];
+  services: Service[];
 }
 
 export interface Message {
@@ -110,9 +125,11 @@ export interface Closure {
   evidenceRef: string;        // e.g. histology report ID / FHIR DiagnosticReport id
   plan: string;               // treatment / surveillance / return to routine
   nextScreeningDue?: string;
+  signedById?: string;
   signedBy: string;           // clinician name
   signedLicence: string;
   signedAt: number;
+  approvedById?: string;
   approvedBy?: string;        // second approver for exception closures
   approvedAt?: number;
   status: 'CLOSED' | 'PENDING_APPROVAL';
@@ -178,7 +195,7 @@ export interface Case {
   outcomeCategory?: 'NORMAL' | 'BENIGN' | 'PRECANCER' | 'DISEASE';
   closure?: Closure;
   audit: AuditEntry[];
-  historical?: boolean; // generated background case for metrics
+  historical?: boolean; // closed case kept only so the measures have history
 }
 
 export interface Toast {

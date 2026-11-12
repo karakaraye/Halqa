@@ -1,9 +1,12 @@
-import { Case, Lang, PathwayId, Urgency, StepId, Channel, DelayReason, Person } from '@/types/halqa';
+// Records for trying the screens in local development and automated tests. Every person and
+// result here is invented. Nothing in this file is loaded by `npm run setup`.
+import { Case, Lang, PathwayId, Urgency, StepId, Channel, Person } from '@/types/halqa';
 import { PATHWAYS, PEOPLE, HOUR, DAY, URGENCY_FACTOR, SPECIALIST_SERVICES } from './pathways';
 
-// Demo "now": Saturday 7 Nov 2026, 09:00 Gulf Standard Time
-export const DEMO_START = Date.UTC(2026, 10, 7, 5, 0, 0);
-const T = (hoursAgo: number) => DEMO_START - hoursAgo * HOUR;
+// Reference time the seeded cases are written against (7 Nov 2026, 09:00 Gulf
+// Standard Time). Loading them shifts every timestamp to the present.
+export const SEED_START = Date.UTC(2026, 10, 7, 5, 0, 0);
+const T = (hoursAgo: number) => SEED_START - hoursAgo * HOUR;
 
 function mulberry32(a: number) {
   return () => {
@@ -34,8 +37,8 @@ function base(b: Base): Case {
     accountable: b.pcp,
     steps: {}, clockResets: {}, notifications: [], messages: [], escalations: [], delayReasons: [],
     audit: [
-      { at: issuedAt, actor: b.lab, action: 'Actionable result received (FHIR DiagnosticReport)', detail: `${b.finding} · ${b.code}`, system: true },
-      { at: issuedAt + 60_000, actor: 'Halqa routing', action: `Case opened · pathway “${PATHWAYS[b.pathwayId].short}” · urgency ${b.urgency}`, detail: b.pcp ? `Accountable clinician: ${b.pcp.name}` : 'No registered PCP found — flagged for assignment', system: true },
+      { at: issuedAt, actor: b.lab, action: 'Result received from the lab', detail: `${b.finding} · ${b.code}`, system: true },
+      { at: issuedAt + 60_000, actor: 'Halqa', action: `Case opened: ${PATHWAYS[b.pathwayId].short}`, detail: b.pcp ? `Responsible doctor: ${b.pcp.name}` : 'No doctor on record. Someone must be assigned.', system: true },
     ],
   };
 }
@@ -48,7 +51,7 @@ function done(c: Case, id: StepId, hoursAgo: number, by: string, note?: string, 
 function hand(): Case[] {
   const cases: Case[] = [];
 
-  // 1 — CRITICAL breast, unreachable patient → escalation fires on load
+  // 1. Urgent breast result; the patient has not answered the phone.
   {
     const c = base({
       id: 'HQ-1001', name: 'Aisha Al Mansoori', age: 52, sex: 'F', lang: 'ar', channel: 'PHONE', phone: '+971 50 *** 1182',
@@ -56,12 +59,12 @@ function hand(): Case[] {
       urgency: 'CRITICAL', lab: 'Preventive Screening Hub — Imaging', issuedHoursAgo: 9, navigator: PEOPLE.nav_reem, pcp: PEOPLE.pcp_sara,
     });
     c.notifications.push({ at: T(7), channel: 'PHONE', lang: 'ar', status: 'NO_ANSWER', by: PEOPLE.nav_reem.name });
-    c.audit.push({ at: T(7), actor: PEOPLE.nav_reem.name, action: 'Call attempt 1 — no answer', detail: 'CRITICAL result: human phone call required before any digital message' });
+    c.audit.push({ at: T(7), actor: PEOPLE.nav_reem.name, action: 'Phone call not answered', detail: 'Urgent result: a person must phone before any message is sent' });
     c.delayReasons.push({ at: T(7), reason: 'UNREACHABLE' });
     cases.push(c);
   }
 
-  // 2 — CRC referral waiting in specialist inbox
+  // 2. Bowel referral waiting for the specialist to answer.
   {
     const c = base({
       id: 'HQ-1002', name: 'Sultan Al Mansoori', age: 58, sex: 'M', lang: 'ar', channel: 'WHATSAPP', phone: '+971 50 *** 4192',
@@ -71,14 +74,14 @@ function hand(): Case[] {
     c.notifications.push({ at: T(6 * 24 - 2), channel: 'WHATSAPP', lang: 'ar', status: 'READ', by: 'Halqa messaging' });
     done(c, 'NOTIFY', 6 * 24 - 2, 'Halqa messaging', 'WhatsApp (Arabic) delivered & read');
     c.feedback = { at: T(5 * 24), understoodQ1: true, understoodQ2: true, confidence: 4, lang: 'ar' };
-    done(c, 'ACK', 5 * 24, 'Sultan Al Mansoori', 'Teach-back 2/2 · confidence 4/5', 'Patient confirmed understanding in app');
+    done(c, 'ACK', 5 * 24, 'Sultan Al Mansoori', '2 of 2 right, confidence 4 of 5', 'Patient confirmed understanding');
     done(c, 'CONSULT', 3 * 24, PEOPLE.pcp_mariam.name, 'Tele-consult 12 min. No alarm symptoms. Agreed colonoscopy.', 'Tele-consultation completed');
     c.referral = { facility: 'City Hospital — Gastroenterology', specialty: 'Gastroenterology', priority: 'SOON', note: 'FIT 212. No anticoagulants. Prefers Arabic-speaking team.', status: 'SENT', sentAt: T(30), attempts: 1 };
-    done(c, 'REFER', 30, PEOPLE.pcp_mariam.name, 'Referral packet → City Hospital GI', 'Referral sent (FHIR ServiceRequest)');
+    done(c, 'REFER', 30, PEOPLE.pcp_mariam.name, 'Referral packet to City Hospital GI', 'Referral sent');
     cases.push(c);
   }
 
-  // 3 — Hindi-speaking patient, awaiting acknowledgement (demo: patient app)
+  // 3. Hindi-speaking patient who has been told and has not yet confirmed understanding.
   {
     const c = base({
       id: 'HQ-1003', name: 'Priya Nair', age: 41, sex: 'F', lang: 'hi', channel: 'WHATSAPP', phone: '+971 55 *** 3310', nationality: 'India',
@@ -90,7 +93,7 @@ function hand(): Case[] {
     cases.push(c);
   }
 
-  // 4 — Referral REJECTED → bounced back to PCP, cannot silently drop
+  // 4. Referral sent back to the referring doctor.
   {
     const c = base({
       id: 'HQ-1004', name: 'Muhammad Imran', age: 61, sex: 'M', lang: 'ur', channel: 'SMS', phone: '+971 52 *** 7781', nationality: 'Pakistan',
@@ -100,17 +103,17 @@ function hand(): Case[] {
     c.notifications.push({ at: T(9 * 24 - 5), channel: 'SMS', lang: 'ur', status: 'DELIVERED', by: 'Halqa messaging' });
     done(c, 'NOTIFY', 9 * 24 - 5, 'Halqa messaging', 'SMS (Urdu) delivered');
     c.feedback = { at: T(8 * 24), understoodQ1: true, understoodQ2: true, confidence: 4, lang: 'ur' };
-    done(c, 'ACK', 8 * 24, 'Muhammad Imran', 'Teach-back 2/2 · confidence 4/5', 'Patient confirmed understanding in app');
+    done(c, 'ACK', 8 * 24, 'Muhammad Imran', '2 of 2 right, confidence 4 of 5', 'Patient confirmed understanding');
     done(c, 'CONSULT', 6 * 24, PEOPLE.pcp_arjun.name, 'In-person consult with Urdu-speaking nurse.', 'Consultation completed');
     c.referral = { facility: 'City Hospital — Gastroenterology', specialty: 'Gastroenterology', priority: 'ROUTINE', note: 'FIT 148, lives in Al Dhafra.', status: 'REJECTED', sentAt: T(5 * 24), respondedAt: T(8), rejectReason: 'Outside catchment area', attempts: 1 };
-    done(c, 'REFER', 5 * 24, PEOPLE.pcp_arjun.name, 'Referral → City Hospital GI', 'Referral sent (FHIR ServiceRequest)');
-    c.audit.push({ at: T(8), actor: PEOPLE.sp_tariq.name, action: 'Referral REJECTED', detail: 'Outside catchment area — suggest Regional Hospital Endoscopy Unit' });
+    done(c, 'REFER', 5 * 24, PEOPLE.pcp_arjun.name, 'Referral to City Hospital GI', 'Referral sent');
+    c.audit.push({ at: T(8), actor: PEOPLE.sp_tariq.name, action: 'Referral sent back', detail: 'Outside catchment area — suggest Regional Hospital Endoscopy Unit' });
     c.delayReasons.push({ at: T(8), reason: 'REFERRAL_REJECTED', note: 'Outside catchment area' });
-    c.escalations.push({ id: 'esc_seed_4', at: T(8), level: 1, ruleId: 'R5_REJECTED', reason: 'Referral rejected: Outside catchment area', to: PEOPLE.pcp_arjun.name, stepId: 'ACCEPT' });
+    c.escalations.push({ id: 'esc_seed_4', at: T(8), level: 1, ruleId: 'R5_REJECTED', reason: 'Referral was sent back: Outside catchment area', to: PEOPLE.pcp_arjun.name, stepId: 'ACCEPT' });
     cases.push(c);
   }
 
-  // 5 — Diabetes, confirmatory test overdue → L1 escalation
+  // 5. Diabetes result; the repeat test is late.
   {
     const c = base({
       id: 'HQ-1005', name: 'Omar Farooq', age: 49, sex: 'M', lang: 'en', channel: 'APP', phone: '+971 52 *** 1104',
@@ -120,12 +123,12 @@ function hand(): Case[] {
     c.notifications.push({ at: T(13 * 24 - 3), channel: 'APP', lang: 'en', status: 'READ', by: 'Halqa messaging' });
     done(c, 'NOTIFY', 13 * 24 - 3, 'Halqa messaging', 'App push read');
     c.feedback = { at: T(12 * 24), understoodQ1: true, understoodQ2: true, confidence: 5, lang: 'en' };
-    done(c, 'ACK', 12 * 24, 'Omar Farooq', 'Teach-back 2/2 · confidence 5/5', 'Patient confirmed understanding in app');
+    done(c, 'ACK', 12 * 24, 'Omar Farooq', '2 of 2 right, confidence 5 of 5', 'Patient confirmed understanding');
     c.delayReasons.push({ at: T(4 * 24), reason: 'PATIENT_TRAVEL', note: 'Travelling for work, back 9 Nov' });
     cases.push(c);
   }
 
-  // 6 — Breast, patient missed biopsy (DNA) → back to booking
+  // 6. Breast result; the patient missed the biopsy and needs a new appointment.
   {
     const c = base({
       id: 'HQ-1006', name: 'Maria Santos', age: 55, sex: 'F', lang: 'en', channel: 'WHATSAPP', phone: '+971 56 *** 2209', nationality: 'Philippines',
@@ -135,21 +138,21 @@ function hand(): Case[] {
     c.notifications.push({ at: T(12 * 24 - 4), channel: 'WHATSAPP', lang: 'en', status: 'READ', by: 'Halqa messaging' });
     done(c, 'NOTIFY', 12 * 24 - 4, 'Halqa messaging', 'WhatsApp (English) read');
     c.feedback = { at: T(11 * 24), understoodQ1: true, understoodQ2: true, confidence: 3, lang: 'en' };
-    done(c, 'ACK', 11 * 24, 'Maria Santos', 'Teach-back 2/2 · confidence 3/5', 'Patient confirmed understanding in app');
+    done(c, 'ACK', 11 * 24, 'Maria Santos', '2 of 2 right, confidence 3 of 5', 'Patient confirmed understanding');
     done(c, 'CONSULT', 10 * 24, PEOPLE.pcp_mariam.name, 'Tele-consult. Anxious; reassured, written info sent.', 'Tele-consultation completed');
     c.referral = { facility: 'Women’s Health Centre — Breast Unit', specialty: 'Breast Imaging & Surgery', priority: 'SOON', note: 'BI-RADS 4A calcifications', status: 'ACCEPTED', sentAt: T(10 * 24 - 2), respondedAt: T(9 * 24), attempts: 1 };
-    done(c, 'REFER', 10 * 24 - 2, PEOPLE.pcp_mariam.name, 'Referral → Breast Unit', 'Referral sent (FHIR ServiceRequest)');
-    done(c, 'ACCEPT', 9 * 24, PEOPLE.sp_huda.name, 'Accepted · stereotactic biopsy', 'Referral accepted — custody confirmed');
+    done(c, 'REFER', 10 * 24 - 2, PEOPLE.pcp_mariam.name, 'Referral to Breast Unit', 'Referral sent');
+    done(c, 'ACCEPT', 9 * 24, PEOPLE.sp_huda.name, 'Accepted · stereotactic biopsy', 'Referral accepted');
     c.appointment = { at: T(2 * 24), location: 'Breast Unit, Room 4', bookedBy: 'Maria Santos', dnaCount: 1 };
-    c.audit.push({ at: T(8 * 24), actor: 'Maria Santos', action: 'Appointment self-booked in app', detail: 'Stereotactic biopsy' });
-    c.audit.push({ at: T(2 * 24 - 2), actor: PEOPLE.sp_huda.name, action: 'Did not attend (DNA #1)', detail: 'Patient reported a shift-work clash — rebooking required' });
+    c.audit.push({ at: T(8 * 24), actor: 'Maria Santos', action: 'Patient booked the appointment', detail: 'Stereotactic biopsy' });
+    c.audit.push({ at: T(2 * 24 - 2), actor: PEOPLE.sp_huda.name, action: 'Patient missed the appointment (1st time). A new appointment is needed.', detail: 'Patient reported a shift-work clash' });
     c.delayReasons.push({ at: T(2 * 24 - 2), reason: 'DNA', note: 'Shift-work clash' });
     c.clockResets.BOOK = T(2 * 24 - 2);
-    c.escalations.push({ id: 'esc_seed_6', at: T(2 * 24 - 2), level: 1, ruleId: 'R7_DNA', reason: 'Did not attend biopsy (DNA #1)', to: PEOPLE.nav_reem.name, stepId: 'BOOK', resolvedAt: T(2 * 24 - 1), resolvedBy: PEOPLE.nav_reem.name, resolution: 'Called patient — prefers evening or Saturday slot' });
+    c.escalations.push({ id: 'esc_seed_6', at: T(2 * 24 - 2), level: 1, ruleId: 'R7_DNA', reason: 'Patient missed the appointment (1st time)', to: PEOPLE.nav_reem.name, stepId: 'BOOK', resolvedAt: T(2 * 24 - 1), resolvedBy: PEOPLE.nav_reem.name, resolution: 'Called patient — prefers evening or Saturday slot' });
     cases.push(c);
   }
 
-  // 7 — CRITICAL CRC, no registered PCP → unassigned
+  // 7. Urgent bowel result with no doctor on record.
   {
     const c = base({
       id: 'HQ-1007', name: 'Khalid Al Dhaheri', age: 66, sex: 'M', lang: 'ar', channel: 'PHONE', phone: '+971 50 *** 6630',
@@ -159,12 +162,12 @@ function hand(): Case[] {
     c.notifications.push({ at: T(38), channel: 'PHONE', lang: 'ar', status: 'REACHED', by: PEOPLE.nav_reem.name });
     done(c, 'NOTIFY', 38, PEOPLE.nav_reem.name, 'Phone call in Arabic; result explained; SMS summary sent after call', 'Patient reached by phone');
     c.feedback = { at: T(37), understoodQ1: true, understoodQ2: true, confidence: 3, lang: 'ar' };
-    done(c, 'ACK', 37, PEOPLE.nav_reem.name, 'Teach-back done on the call · confidence 3/5', 'Understanding confirmed by phone teach-back');
-    c.audit.push({ at: T(37), actor: 'Halqa routing', action: 'No registered PCP — recently moved from another emirate', detail: 'Consult step has no accountable physician', system: true });
+    done(c, 'ACK', 37, PEOPLE.nav_reem.name, 'Checked on the call, confidence 3 of 5', 'Understanding confirmed on a call');
+    c.audit.push({ at: T(37), actor: 'Halqa', action: 'No doctor on record', detail: 'Recently moved from another emirate. Someone must be assigned.', system: true });
     cases.push(c);
   }
 
-  // 8 — CRITICAL BI-RADS 5, biopsy done, awaiting histology; active e-consult
+  // 8. Urgent breast result; biopsy done, histology awaited, question open between clinicians.
   {
     const c = base({
       id: 'HQ-1008', name: 'Noura Al Shamsi', age: 47, sex: 'F', lang: 'ar', channel: 'APP', phone: '+971 50 *** 9033',
@@ -174,11 +177,11 @@ function hand(): Case[] {
     c.notifications.push({ at: T(8 * 24 - 1), channel: 'PHONE', lang: 'ar', status: 'REACHED', by: PEOPLE.nav_reem.name });
     done(c, 'NOTIFY', 8 * 24 - 1, PEOPLE.nav_reem.name, 'Phone call in Arabic', 'Patient reached by phone');
     c.feedback = { at: T(8 * 24 - 1), understoodQ1: true, understoodQ2: true, confidence: 3, lang: 'ar' };
-    done(c, 'ACK', 8 * 24 - 1, PEOPLE.nav_reem.name, 'Phone teach-back 2/2', 'Understanding confirmed by phone teach-back');
+    done(c, 'ACK', 8 * 24 - 1, PEOPLE.nav_reem.name, 'Checked on the call, 2 of 2 right', 'Understanding confirmed on a call');
     done(c, 'CONSULT', 7 * 24, PEOPLE.pcp_sara.name, 'Same-day consult', 'Consultation completed');
     c.referral = { facility: 'Women’s Health Centre — Breast Unit', specialty: 'Breast Imaging & Surgery', priority: 'URGENT', note: 'BI-RADS 5 — 2-week pathway', status: 'ACCEPTED', sentAt: T(7 * 24 - 1), respondedAt: T(7 * 24 - 4 + 3), attempts: 1 };
-    done(c, 'REFER', 7 * 24 - 1, PEOPLE.pcp_sara.name, 'Urgent referral → Breast Unit', 'Referral sent (FHIR ServiceRequest)');
-    done(c, 'ACCEPT', 7 * 24 - 4, PEOPLE.sp_huda.name, 'Accepted within 3h', 'Referral accepted — custody confirmed');
+    done(c, 'REFER', 7 * 24 - 1, PEOPLE.pcp_sara.name, 'Urgent referral to Breast Unit', 'Referral sent');
+    done(c, 'ACCEPT', 7 * 24 - 4, PEOPLE.sp_huda.name, 'Accepted within 3h', 'Referral accepted');
     c.appointment = { at: T(3 * 24), location: 'Breast Unit, Room 2', bookedBy: 'Breast Unit scheduler', dnaCount: 0 };
     done(c, 'BOOK', 6 * 24, 'Breast Unit scheduler', 'Ultrasound-guided core biopsy', 'Appointment booked');
     done(c, 'ATTEND', 3 * 24, PEOPLE.sp_huda.name, 'US-guided core biopsy ×3 cores', 'Core biopsy performed');
@@ -186,7 +189,7 @@ function hand(): Case[] {
     cases.push(c);
   }
 
-  // 9 — Cervical, care plan done → ready for signed closure (demo: closure gate)
+  // 9. Cervical result; treatment done, ready to be signed off.
   {
     const c = base({
       id: 'HQ-1009', name: 'Lakshmi Iyer', age: 38, sex: 'F', lang: 'hi', channel: 'WHATSAPP', phone: '+971 55 *** 6402', nationality: 'India',
@@ -196,11 +199,11 @@ function hand(): Case[] {
     c.notifications.push({ at: T(34 * 24 - 3), channel: 'WHATSAPP', lang: 'hi', status: 'READ', by: 'Halqa messaging' });
     done(c, 'NOTIFY', 34 * 24 - 3, 'Halqa messaging', 'WhatsApp (Hindi) read');
     c.feedback = { at: T(33 * 24), understoodQ1: true, understoodQ2: true, confidence: 4, lang: 'hi' };
-    done(c, 'ACK', 33 * 24, 'Lakshmi Iyer', 'Teach-back 2/2 · confidence 4/5', 'Patient confirmed understanding in app');
+    done(c, 'ACK', 33 * 24, 'Lakshmi Iyer', '2 of 2 right, confidence 4 of 5', 'Patient confirmed understanding');
     done(c, 'CONSULT', 31 * 24, PEOPLE.pcp_mariam.name, 'Tele-consult with Hindi interpreter', 'Tele-consultation completed');
     c.referral = { facility: 'Women’s Health Centre — Colposcopy', specialty: 'Gynaecology (Colposcopy)', priority: 'SOON', note: 'HSIL', status: 'ACCEPTED', sentAt: T(31 * 24 - 1), respondedAt: T(30 * 24), attempts: 1 };
-    done(c, 'REFER', 31 * 24 - 1, PEOPLE.pcp_mariam.name, 'Referral → Colposcopy', 'Referral sent (FHIR ServiceRequest)');
-    done(c, 'ACCEPT', 30 * 24, PEOPLE.sp_lina.name, 'Accepted', 'Referral accepted — custody confirmed');
+    done(c, 'REFER', 31 * 24 - 1, PEOPLE.pcp_mariam.name, 'Referral to Colposcopy', 'Referral sent');
+    done(c, 'ACCEPT', 30 * 24, PEOPLE.sp_lina.name, 'Accepted', 'Referral accepted');
     c.appointment = { at: T(20 * 24), location: 'Colposcopy Clinic', bookedBy: 'Lakshmi Iyer', dnaCount: 0 };
     done(c, 'BOOK', 29 * 24, 'Lakshmi Iyer', 'Self-booked in app', 'Appointment booked');
     done(c, 'ATTEND', 20 * 24, PEOPLE.sp_lina.name, 'Colposcopy + directed biopsy', 'Colposcopy performed');
@@ -211,7 +214,7 @@ function hand(): Case[] {
     cases.push(c);
   }
 
-  // 10 — Diabetes, low teach-back + callback requested
+  // 10. Diabetes result; the patient misunderstood and asked for a call.
   {
     const c = base({
       id: 'HQ-1010', name: 'Ahmed Hassan', age: 57, sex: 'M', lang: 'ar', channel: 'SMS', phone: '+971 50 *** 5521', nationality: 'Egypt',
@@ -222,13 +225,13 @@ function hand(): Case[] {
     done(c, 'NOTIFY', 49, 'Halqa messaging', 'SMS (Arabic) delivered');
     c.feedback = { at: T(5), understoodQ1: false, understoodQ2: true, confidence: 2, lang: 'ar' };
     c.callbackRequestedAt = T(5);
-    c.audit.push({ at: T(5), actor: 'Ahmed Hassan', action: 'Teach-back 1/2 · confidence 2/5 — call back requested', detail: 'Patient thought result meant he definitely has a serious disease' });
-    c.escalations.push({ id: 'esc_seed_10', at: T(5), level: 1, ruleId: 'R6_LOW_UNDERSTANDING', reason: 'Teach-back 1/2, confidence 2/5', to: PEOPLE.nav_reem.name, stepId: 'ACK' });
+    c.audit.push({ at: T(5), actor: 'Ahmed Hassan', action: 'Patient answered the understanding check: 1 of 2 right, confidence 2 of 5', detail: 'Patient thought result meant he definitely has a serious disease' });
+    c.escalations.push({ id: 'esc_seed_10', at: T(5), level: 1, ruleId: 'R6_LOW_UNDERSTANDING', reason: 'Patient may not have understood the result', to: PEOPLE.nav_reem.name, stepId: 'ACK' });
     c.delayReasons.push({ at: T(5), reason: 'LOW_UNDERSTANDING' });
     cases.push(c);
   }
 
-  // 11 — CRC accepted, patient can self-book
+  // 11. Bowel referral accepted; the patient can book.
   {
     const c = base({
       id: 'HQ-1011', name: 'John Peters', age: 63, sex: 'M', lang: 'en', channel: 'APP', phone: '+971 54 *** 8890', nationality: 'UK',
@@ -238,15 +241,15 @@ function hand(): Case[] {
     c.notifications.push({ at: T(8 * 24 - 1), channel: 'APP', lang: 'en', status: 'READ', by: 'Halqa messaging' });
     done(c, 'NOTIFY', 8 * 24 - 1, 'Halqa messaging', 'App push read');
     c.feedback = { at: T(7 * 24 + 12), understoodQ1: true, understoodQ2: true, confidence: 5, lang: 'en' };
-    done(c, 'ACK', 7 * 24 + 12, 'John Peters', 'Teach-back 2/2 · confidence 5/5', 'Patient confirmed understanding in app');
+    done(c, 'ACK', 7 * 24 + 12, 'John Peters', '2 of 2 right, confidence 5 of 5', 'Patient confirmed understanding');
     done(c, 'CONSULT', 6 * 24, PEOPLE.pcp_arjun.name, 'E-consult questionnaire + phone review', 'Consultation completed');
     c.referral = { facility: 'City Hospital — Gastroenterology', specialty: 'Gastroenterology', priority: 'ROUTINE', note: 'FIT 130', status: 'ACCEPTED', sentAt: T(5 * 24), respondedAt: T(3 * 24), attempts: 1 };
-    done(c, 'REFER', 5 * 24, PEOPLE.pcp_arjun.name, 'Referral → City Hospital GI', 'Referral sent (FHIR ServiceRequest)');
-    done(c, 'ACCEPT', 3 * 24, PEOPLE.sp_tariq.name, 'Accepted · bowel-prep pack posted', 'Referral accepted — custody confirmed');
+    done(c, 'REFER', 5 * 24, PEOPLE.pcp_arjun.name, 'Referral to City Hospital GI', 'Referral sent');
+    done(c, 'ACCEPT', 3 * 24, PEOPLE.sp_tariq.name, 'Accepted · bowel-prep pack posted', 'Referral accepted');
     cases.push(c);
   }
 
-  // 12 — Cervical, patient declined: exception closure awaiting 2nd approver
+  // 12. Cervical result; the patient said no, early closure awaits a second approver.
   {
     const c = base({
       id: 'HQ-1012', name: 'Hessa Al Ameri', age: 44, sex: 'F', lang: 'ar', channel: 'APP', phone: '+971 50 *** 7740',
@@ -256,7 +259,7 @@ function hand(): Case[] {
     c.notifications.push({ at: T(21 * 24 - 2), channel: 'APP', lang: 'ar', status: 'READ', by: 'Halqa messaging' });
     done(c, 'NOTIFY', 21 * 24 - 2, 'Halqa messaging', 'App push (Arabic) read');
     c.feedback = { at: T(20 * 24), understoodQ1: true, understoodQ2: true, confidence: 4, lang: 'ar' };
-    done(c, 'ACK', 20 * 24, 'Hessa Al Ameri', 'Teach-back 2/2', 'Patient confirmed understanding in app');
+    done(c, 'ACK', 20 * 24, 'Hessa Al Ameri', '2 of 2 right', 'Patient confirmed understanding');
     done(c, 'CONSULT', 17 * 24, PEOPLE.pcp_mariam.name, 'Two consults incl. female interpreter. Patient declines colposcopy for now; accepts repeat HPV in 12 months.', 'Consultation completed');
     c.delayReasons.push({ at: T(17 * 24), reason: 'PATIENT_DECLINED' });
     c.closure = {
@@ -264,14 +267,15 @@ function hand(): Case[] {
       plan: 'Repeat HPV test in 12 months; navigator check-in at 3 months', nextScreeningDue: 'Nov 2027', signedBy: PEOPLE.pcp_mariam.name,
       signedLicence: PEOPLE.pcp_mariam.licence!, signedAt: T(20), status: 'PENDING_APPROVAL', justification: 'Capacity confirmed; risks explained in Arabic; written information given; patient may re-enter pathway any time.',
     };
-    c.audit.push({ at: T(20), actor: PEOPLE.pcp_mariam.name, action: 'Exception closure submitted — awaiting 2nd approver', detail: 'Declined after informed discussion' });
+    c.audit.push({ at: T(20), actor: PEOPLE.pcp_mariam.name, action: 'Asked to close early. A second person must approve.', detail: 'Declined after informed discussion' });
     cases.push(c);
   }
 
   return cases;
 }
 
-// ── Background historical cohort for live metrics ──────────────
+// Closed cases from earlier months, generated from a fixed seed so the
+// measures have something to count.
 const FIRST = ['Mohammed', 'Fatma', 'Ali', 'Mariam', 'Rashid', 'Shamma', 'Ravi', 'Anita', 'Imran', 'Sana', 'Jose', 'Grace', 'David', 'Layla', 'Yousef', 'Amna', 'Kiran', 'Bilal', 'Elena', 'Hamad'];
 const LAST = ['Al Suwaidi', 'Al Marzouqi', 'Kumar', 'Qureshi', 'Reyes', 'Al Hammadi', 'Khan', 'Thomas', 'Al Falasi', 'Pillai', 'Haddad', 'Al Ketbi'];
 const OUTCOMES: Record<PathwayId, { cat: Case['outcomeCategory']; outcome: string; plan: string; w: number }[]> = {
@@ -332,7 +336,7 @@ function historical(n: number): Case[] {
       team: { NAVIGATOR: nav, PCP: pcp, SPECIALIST: pid === 'DIABETES_HBA1C' ? undefined : specialist },
       accountable: pcp, steps: {}, clockResets: {}, notifications: [], messages: [], escalations: [], delayReasons: [], audit: [], historical: true,
     };
-    // Simulate step durations (offsets from issue), mostly within SLA
+    // Step durations as offsets from the issue time, mostly inside the target.
     let t = 0;
     const offsets: Partial<Record<StepId, number>> = {};
     const breaches: StepId[] = [];
@@ -347,7 +351,7 @@ function historical(n: number): Case[] {
       t += dur;
       offsets[s.id] = t;
     }
-    const issuedAt = DEMO_START - t - (2 + r() * 110) * DAY;
+    const issuedAt = SEED_START - t - (2 + r() * 110) * DAY;
     c.issuedAt = issuedAt;
     for (const s of p.steps) c.steps[s.id] = { completedAt: issuedAt + offsets[s.id]!, by: 'historical' };
     c.delayReasons = c.delayReasons.map((d) => ({ ...d, at: issuedAt }));
@@ -359,13 +363,13 @@ function historical(n: number): Case[] {
     c.feedback = { at: issuedAt + offsets.ACK!, understoodQ1: q1, understoodQ2: q2, confidence: Math.min(5, Math.max(1, Math.round(3.4 + r() * 1.8 - (q1 && q2 ? 0 : 1.2)))), lang };
     for (const b of breaches) {
       const at = issuedAt + offsets[b]! - HOUR * 2;
-      c.escalations.push({ id: `esc_h_${i}_${b}`, at, level: 1, ruleId: 'R1_OVERDUE', reason: 'Step overdue', to: 'Owner + Coordination Lead', stepId: b, resolvedAt: at + (1 + r() * 18) * HOUR, resolvedBy: nav.name, resolution: 'Actioned' });
+      c.escalations.push({ id: `esc_h_${i}_${b}`, at, level: 1, ruleId: 'R1_OVERDUE', reason: 'A step was late', to: 'Care coordination lead', stepId: b, resolvedAt: at + (1 + r() * 18) * HOUR, resolvedBy: nav.name, resolution: 'Actioned' });
     }
     const o = pick(r, OUTCOMES[pid]);
     c.outcomeCategory = o.cat;
     const closedAt = issuedAt + offsets.CLOSE!;
     c.closure = { kind: 'EVIDENCE', outcome: o.outcome, evidenceRef: `RPT-${(55000 + i * 7).toString()}`, plan: o.plan, signedBy: pcp.name, signedLicence: pcp.licence!, signedAt: closedAt, status: 'CLOSED' };
-    c.audit.push({ at: issuedAt, actor: 'Lab', action: 'Result received', system: true }, { at: closedAt, actor: pcp.name, action: 'Loop closed & signed', detail: o.outcome });
+    c.audit.push({ at: issuedAt, actor: 'Lab', action: 'Result received', system: true }, { at: closedAt, actor: pcp.name, action: 'Case closed and signed', detail: o.outcome });
     out.push(c);
   }
   return out;
@@ -375,7 +379,7 @@ export function seedCases(): Case[] {
   return [...hand(), ...historical(56)];
 }
 
-// ── New incoming results for live demo ingestion ───────────────
+// Results fed in by the simulation control (INGEST).
 export const INCOMING_TEMPLATES: Omit<Base, 'id' | 'issuedHoursAgo'>[] = [
   {
     name: 'Zayed Al Dhaheri', age: 59, sex: 'M', lang: 'ar', channel: 'PHONE', phone: '+971 50 *** 7721', pathwayId: 'CRC_FIT',
@@ -398,7 +402,7 @@ export const INCOMING_TEMPLATES: Omit<Base, 'id' | 'issuedHoursAgo'>[] = [
 export function makeIncoming(templateIdx: number, now: number, seq: number): Case {
   const t = INCOMING_TEMPLATES[templateIdx % INCOMING_TEMPLATES.length];
   const c = base({ ...t, id: `HQ-${1100 + seq}`, issuedHoursAgo: 0 });
-  // re-time to "now" on the sim clock
+  // Move the timestamps to the workspace clock.
   const shift = now - c.issuedAt;
   c.issuedAt = now;
   c.audit = c.audit.map((a) => ({ ...a, at: a.at + shift }));
