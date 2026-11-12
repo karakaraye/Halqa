@@ -197,3 +197,30 @@ async function loginPage(browser: import('@playwright/test').Browser, id: string
   await loginAs(page, id);
   return { context, page };
 }
+
+test('K5. the add-a-receiving-service dialog traps focus and Escape gives focus back to its button', async ({ browser }) => {
+  const lead = await loginPage(browser, 'lead_fatima');
+  const page = lead.page;
+  await tabTo(page, page.getByRole('button', { name: 'Accounts', exact: true }));
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: 'User accounts' })).toBeVisible();
+
+  // The two sections are tabs: Tab reaches the selected one, an arrow key moves to the other.
+  await tabTo(page, page.getByRole('tab', { name: 'People' }));
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('tab', { name: 'Receiving services' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('heading', { name: 'Receiving services', level: 1 })).toBeVisible();
+
+  const opener = page.getByRole('button', { name: 'Add a receiving service' });
+  await tabTo(page, opener);
+  await page.keyboard.press('Enter');
+  const dialog = page.getByRole('dialog', { name: 'Add a receiving service' });
+  await expect(dialog).toBeVisible();
+  expect(await insideDialog(page)).toBe(true);
+  for (let i = 0; i < 20; i += 1) { await page.keyboard.press('Tab'); expect(await insideDialog(page), `Tab ${i + 1} stays inside`).toBe(true); expect(await hasVisibleFocus(page)).toBe(true); }
+  for (let i = 0; i < 20; i += 1) { await page.keyboard.press('Shift+Tab'); expect(await insideDialog(page), `Shift+Tab ${i + 1} stays inside`).toBe(true); }
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  expect(await isFocused(opener), 'focus returns to Add a receiving service').toBe(true);
+  await lead.context.close();
+});

@@ -101,6 +101,30 @@ test('S2. lead screens: Overview, Approvals, Accounts and the two account dialog
   await context.close();
 });
 
+test('S2b. lead screens: Receiving services, the add dialog and the disable dialog', async ({ browser }) => {
+  const { context, page } = await session(browser, 'lead_fatima');
+  await goToTab(page, 'Accounts');
+  await page.getByRole('tab', { name: 'Receiving services' }).click();
+  await expect(page.getByRole('heading', { name: 'Receiving services', level: 1 })).toBeVisible();
+  await expect(page.getByRole('article').first()).toBeVisible();
+  await review(page, 'Receiving services', 'services', STAFF_WIDTHS);
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.getByRole('button', { name: 'Add a receiving service' }).click();
+  await expect(page.getByRole('dialog', { name: 'Add a receiving service' })).toBeVisible();
+  await review(page, 'Add a receiving service dialog', 'add-service-dialog', STAFF_WIDTHS, true);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.getByRole('article').filter({ has: page.getByRole('button', { name: /^Disable/ }) }).first().getByRole('button', { name: /^Disable/ }).click();
+  await expect(page.getByRole('dialog', { name: 'Disable this service?' })).toBeVisible();
+  await review(page, 'Disable this service dialog', 'disable-service-dialog', STAFF_WIDTHS, true);
+  await page.getByRole('button', { name: 'Not now' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await context.close();
+});
+
 test('S3. navigator, doctor and specialist screens with the close, hand-over and send-back dialogs', async ({ browser, request }) => {
   const name = 'Huda Karimi';
   const caseId = await intakeCase(request, { name, pcpId: 'pcp_mariam' });

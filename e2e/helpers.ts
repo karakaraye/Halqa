@@ -319,3 +319,22 @@ export async function disableMadeAccounts(browser: Browser) {
   }
   await lead.close();
 }
+
+/* ------------------------------------------------------------------ receiving services */
+
+/** Every receiving service a browser test adds starts with this, so it can be found and disabled afterwards. */
+export const SERVICE_PREFIX = 'Browser test unit';
+
+/** Disables the receiving services browser tests added. A leftover active one would be offered to doctors in later tests. */
+export async function disableTestServices(browser: Browser) {
+  const lead = await apiLogin(browser, 'lead_fatima');
+  const s = await state(lead);
+  const listed = await lead.request.get('/api/admin/services');
+  const services = (await listed.json()).services as { id: string; facility: string; disabled: boolean }[];
+  for (const svc of services) {
+    if (svc.facility.startsWith(SERVICE_PREFIX) && !svc.disabled) {
+      await lead.request.post(`/api/admin/services/${svc.id}/disable`, { headers: { origin: ORIGIN, 'x-halqa-csrf': s.csrf }, data: {} });
+    }
+  }
+  await lead.close();
+}
