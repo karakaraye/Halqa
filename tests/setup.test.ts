@@ -1,6 +1,6 @@
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { database, closeDatabases } from '../src/server/db';
@@ -18,6 +18,9 @@ const args = ['--email', 'first.lead@example.test', '--name', 'First Lead', '--o
 
 test('setup creates only the first lead, in the default network, and stores the password hashed', () => {
   const cwdBefore = readdirSync(process.cwd()).sort();
+  // A credentials file left by an older version may exist; setup must neither create nor touch one.
+  const oldFile = join('data', 'local-accounts.txt');
+  const oldFileBefore = existsSync(oldFile) ? statSync(oldFile).mtimeMs : null;
   const result = setupFirstLead(args);
   const db = database();
   const users = db.prepare('SELECT id,email,password_hash,network,must_change_password FROM users').all() as { email: string; password_hash: string; network: string; must_change_password: number }[];
@@ -32,7 +35,7 @@ test('setup creates only the first lead, in the default network, and stores the 
   assert.ok(result.lines.some(l => l.includes(result.temporaryPassword)));
   assert.ok(!users[0].password_hash.includes(result.temporaryPassword));
   closeDatabases();
-  assert.ok(!existsSync(join('data', 'local-accounts.txt')));
+  assert.equal(existsSync(oldFile) ? statSync(oldFile).mtimeMs : null, oldFileBefore, 'setup writes no credentials file');
   assert.deepEqual(readdirSync(process.cwd()).sort(), cwdBefore, 'nothing is written beside the database');
   assert.deepEqual(readdirSync(directory).filter(n => !n.startsWith('halqa.sqlite')), []);
   // The new lead can sign in with it and sees an empty workspace.
