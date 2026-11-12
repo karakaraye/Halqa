@@ -10,6 +10,7 @@ import {
   Avatar, Button, Card, Chip, Dialog, Empty, Field, Input, Loading, SaveButton, Select, initialsOf,
 } from '@/components/design/primitives';
 import { callServer } from '@/components/design/request';
+import { ServicesSection } from '@/components/staff/ServicesSection';
 
 export interface AccountSummary {
   id: string;
@@ -49,6 +50,7 @@ export function AccountsPage() {
   const [createdResult, setCreatedResult] = useState<{ account: AccountSummary; temporaryPassword: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [actionPending, setActionPending] = useState(false);
+  const [tab, setTab] = useState<AccountsTab>('people');
 
   const fetchAccounts = async () => {
     try {
@@ -90,8 +92,21 @@ export function AccountsPage() {
     }
   };
 
+  if (tab === 'services') {
+    return (
+      <div className="space-y-6">
+        <AccountsTabs tab={tab} onChange={setTab} />
+        <div role="tabpanel" id="accounts-panel" aria-labelledby="accounts-tab-services">
+          <ServicesSection />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      <AccountsTabs tab={tab} onChange={setTab} />
+      <div role="tabpanel" id="accounts-panel" aria-labelledby="accounts-tab-people" className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-page-title text-slate-900">User accounts</h1>
@@ -240,6 +255,46 @@ export function AccountsPage() {
           </p>
         </Dialog>
       )}
+      </div>
+    </div>
+  );
+}
+
+type AccountsTab = 'people' | 'services';
+
+const ACCOUNTS_TABS: { id: AccountsTab; label: string }[] = [
+  { id: 'people', label: 'People' },
+  { id: 'services', label: 'Receiving services' },
+];
+
+/** Two segmented tabs at the top of the Accounts screen. Arrow keys move between them. */
+function AccountsTabs({ tab, onChange }: { tab: AccountsTab; onChange: (t: AccountsTab) => void }) {
+  const move = (e: React.KeyboardEvent, index: number) => {
+    const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    const next = ACCOUNTS_TABS[(index + step + ACCOUNTS_TABS.length) % ACCOUNTS_TABS.length];
+    onChange(next.id);
+    requestAnimationFrame(() => document.getElementById(`accounts-tab-${next.id}`)?.focus());
+  };
+  return (
+    <div role="tablist" aria-label="Accounts sections" className="inline-flex flex-wrap gap-1 rounded-button bg-slate-100 p-1">
+      {ACCOUNTS_TABS.map((t, i) => (
+        <button
+          key={t.id}
+          type="button"
+          role="tab"
+          id={`accounts-tab-${t.id}`}
+          aria-selected={tab === t.id}
+          aria-controls="accounts-panel"
+          tabIndex={tab === t.id ? 0 : -1}
+          onClick={() => onChange(t.id)}
+          onKeyDown={(e) => move(e, i)}
+          className={`min-h-[48px] rounded-button px-5 text-[16px] font-semibold transition-colors ${tab === t.id ? 'bg-white text-teal-800 shadow-sm' : 'text-slate-700 hover:bg-slate-200'}`}
+        >
+          {t.label}
+        </button>
+      ))}
     </div>
   );
 }
