@@ -160,6 +160,16 @@ Clinic Leads manage staff accounts directly through the **Accounts** screen with
 
 ![Accounts Management](design/compare/accounts-1440.png)
 
+### Add and disable a receiving service
+A receiving service is a hospital unit or clinic that accepts referrals for one care programme and is answered by one specialist account. A doctor can only send a referral to a service listed here, so a programme with no active service cannot send referrals at all. Clinic Leads manage them on the **Accounts** screen:
+1. Open the **Accounts** tab, then choose **Receiving services** at the top of the screen (the other choice, **People**, is the account list).
+2. Each service shows the name of the unit, the programme, the specialty, **Answered by** the specialist, and a word: **Active** or **Disabled**.
+3. **Add one:** press **Add a receiving service**. Fill in **Name of the unit** (the name doctors will see), **Specialty**, **Care programme** and **Specialist who answers**, then press **Add service**. If the list of specialists is empty, the screen asks you to add a specialist account first on the **People** tab. If that unit already has a service for that programme, the screen says so and stays open so you can change the details.
+4. **Disable one:** press **Disable** on the service, read the message, then press **Disable service** (or **Not now** to keep it). New referrals to that unit are refused from then on. Referrals already sent stay as they are. A disabled service has no button.
+5. Doctors see the change within a few seconds, the next time their screen refreshes.
+
+![Receiving services](design/compare/services-1440.png)
+
 ---
 
 ## 6. Patient Portal Guide

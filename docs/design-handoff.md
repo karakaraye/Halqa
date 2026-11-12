@@ -76,6 +76,7 @@ The staff top bar also has "Password" (change your password) and "Sign out". Whi
 
 ## Decisions that differ from the drawings
 
+- Receiving services are a section of the Accounts screen, not a new tab in the top bar. They are set up rarely and by the same person who manages accounts, and a specialist account must exist first, so the two belong together. A fourth lead tab would also crowd the bar at 390 px. The screen has two segmented tabs, People and Receiving services; the selected one is remembered only while the screen is open.
 - The top bar shows only the tabs the signed-in role may use (the drawings show all four for one person), and has Password and Sign out buttons that the drawings do not draw. Staff need both.
 - Hand-over lists doctors and matching specialists only; navigators are not offered because the server refuses it. "Hand over this patient" and "Close this case" are shown only to the roles the server allows (hand-over: doctor, specialist, clinic lead; closing: doctor, specialist). The drawing shows the hand-over button for a navigator; it is left out because it would only fail. A navigator sees the line "Only a doctor can close a case." in its place.
 - The close-case pop-up shows the real rules from `closureChecks()` and has a plan field and the three exception kinds.
@@ -94,7 +95,7 @@ The staff top bar also has "Password" (change your password) and "Sign out". Whi
 
 ## Screens built after the drawings (same style, not drawn in Figma)
 
-Change password (the forced first-time screen and the pop-up from the top bar), Accounts (lead: list, create with a one-time temporary password, disable), the interpreter row and request, and the "Something is slowing this down" card on the case page. They follow the same tokens and components.
+Change password (the forced first-time screen and the pop-up from the top bar), Accounts (lead: list, create with a one-time temporary password, disable), Receiving services (lead: a section of Accounts that lists the units that accept referrals, adds one and disables one; `src/components/staff/ServicesSection.tsx`), the interpreter row and request, and the "Something is slowing this down" card on the case page. They follow the same tokens and components.
 
 ## Content rules
 

@@ -228,3 +228,22 @@ A clean checkout of the release tree (`npm ci`, then each command below), Node 2
 | `npm audit` | 7 moderate findings in linting tools; `npm audit fix` changes nothing because no patched release exists (details in `docs/security.md` section 6a) |
 
 Not run in this pass: the load check (the figures in Run 8 stand), a real TLS deployment, an independent penetration test or accessibility audit.
+
+## Run 11 — 12 November 2026, receiving services screen
+
+Branch `feature/receiving-services` after `npm ci`, Node 24.22.1, Windows 11. The browser runs used port 3101 through `HALQA_E2E_PORT` with nothing else listening on it. The first browser run was made with `SAVE_SCREENSHOTS=1` (six new pictures, and the two Accounts pictures retaken because the screen now has two tabs); the second was made without it.
+
+| Check | Result |
+|---|---|
+| `npm ci` | completes |
+| `npx tsc --noEmit` | pass, no errors |
+| `npm run lint` (`eslint .`) | exit 0, no errors, no warnings |
+| `npm test` | 117 of 117 pass |
+| `npm run secrets-scan` | no findings |
+| `npm run build` | pass |
+| `npm run test:e2e`, first run | 40 of 40 pass (5.9 min) |
+| `npm run test:e2e`, second run | 40 of 40 pass (5.8 min) |
+
+The 8 new browser tests: R1 (a lead adds a receiving service, the doctor's referral form offers it, the lead disables it and the form stops offering it), R2 (empty state), R3 (list that cannot be loaded, then Try again), R4 (the same unit and programme twice gives the plain sentence and keeps the dialog open), R5 (a refused specialist gives the plain sentence; a directory with no specialist shows the notice and turns Add service off), R6 (axe, colour contrast on, at 1440 and 390 on the empty list, the list with items, the add dialog and the disable dialog), K5 (keyboard: arrow keys between the two tabs, Tab kept inside the add dialog, Escape returns focus to Add a receiving service), and S2b (screens and screenshots). The empty list and the list-failure cases use a stubbed list answer because the shared test database always holds the programme's starting services.
+
+Not run in this pass: `npm audit`, the load check, a real TLS deployment, an independent penetration test or accessibility audit.

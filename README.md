@@ -44,7 +44,7 @@ Checks run on the release tree (13 November 2026, from a clean `npm ci`). Dated 
 | `npm test` | 117 of 117 unit, security and operations tests pass |
 | `npm run secrets-scan` | no findings |
 | `npm run build` | passes |
-| `npm run test:e2e` | 32 of 32 browser tests pass, in two runs |
+| `npm run test:e2e` | 40 of 40 browser tests pass, in two runs |
 | `npm audit --omit=dev` | 0 vulnerabilities. The 7 moderate findings in development tooling are explained in [`docs/security.md`](docs/security.md) |
 | Load check (`npm run load-check`: 5 minutes, 50 signed-in clients, 2,000 open cases) | p50 24 ms, p95 140 ms, p99 305 ms, 0 errors (development machine) |
 
@@ -84,7 +84,7 @@ Halqa does not replace the patient record or the laboratory system. It receives 
 | **Hand-over** | Passing a patient to another doctor or specialist. The current holder stays responsible until the other person accepts. |
 | **Closure** | The signed end of a case. **Standard** closure needs the test result and a plan. **Exception** closure (the patient said no after a clear talk, care completed elsewhere, the patient moved away) needs a second approval. |
 | **Network** | One organisation's whole set of staff, patients and cases. People only ever see their own network. |
-| **Directory** | The staff list and receiving services of a network. It lives in the database: staff are managed on the Accounts screen, receiving services through the clinic lead's service routes (section 14). |
+| **Directory** | The staff list and receiving services of a network. It lives in the database: staff and receiving services are both managed on the Accounts screen (the routes are in section 14). |
 | **Outbox** | Patient messages waiting to be sent. A message is only counted as delivered when the message service reports it. |
 
 ---
@@ -180,7 +180,7 @@ Anyone with a hand-over waiting for them can also see that case.
 | Approve or send back an exception closure | | | | Yes | |
 | Message the patient | Yes | Yes | Yes | Yes | Replies only |
 | Message between clinicians | | Yes | Yes | Yes | |
-| Create and disable accounts (screen), and receiving services (routes only) | | | | Yes | |
+| Create and disable accounts and receiving services (Accounts screen) | | | | Yes | |
 
 The server enforces this table on every action. Screens only hide what the server would refuse. Staff cannot act as a patient, and a patient can only write to their own care team.
 
@@ -199,7 +199,7 @@ Screenshots are taken from the running application with local development record
 | **Referrals** | Specialist | Referrals waiting for a decision (accept, ask for more information, send back with a reason), questions from doctors, and accepted patients |
 | **Overview** | Everyone | Measured figures: time to tell patients, tests on time, cases fully finished, patients who understood, where patients get stuck, and how each programme is doing. Export as CSV |
 | **Approvals** | Clinic lead | Exception closures waiting for a second approval, things that are late or stuck, and how the system decides what is urgent |
-| **Accounts** | Clinic lead | List accounts, create them (temporary password shown once) and disable them |
+| **Accounts** | Clinic lead | Two tabs. People: list accounts, create them (temporary password shown once) and disable them. Receiving services: list the units that accept referrals, add one (name, specialty, care programme, the specialist who answers) and disable one |
 
 Tabs shown: navigator and doctor see My work and Overview; specialists see Referrals and Overview; the lead sees Overview, Approvals and Accounts. Everyone has Password and Sign out in the top bar.
 
@@ -524,7 +524,7 @@ npm run test:e2e        # once: npx playwright install chromium
 | Suite | What it covers |
 |---|---|
 | **Unit and security tests** (`tests/`, 117 tests, well under a minute) | Closure and approval rules, permissions per role, patient projection, sign-in and lock-out, sessions (idle, revoke), forced password change, rate limits and proxy spoofing, intake (keys, validation, idempotence), outbox and delivery reports (retries, webhook rules), directory checks, server-side scoring, concurrency and retries, snapshots do not write, `ETag`/`304`, setup, backup, export, logging without secrets, secrets scan |
-| **Browser tests** (`e2e/`, 32 tests, 4 to 9 minutes) | Sign-in and forced password change; account creation and disabling; every role's tabs and landing page; the whole care path through the screens (intake, call, quick check, consult, referral, accept, booking, attendance, result, plan, closure); send back and re-route; low understanding and the navigator's call; hand-over accepted and declined; exception closure approved and sent back; message delivery; sign-out leaks, safe retries, offline, "not on your list"; axe accessibility checks on **every screen and dialog** at two widths with colour contrast on; keyboard-only use and focus trapping |
+| **Browser tests** (`e2e/`, 40 tests, 4 to 9 minutes) | Sign-in and forced password change; account creation and disabling; adding and disabling receiving services, with the doctor's referral choices following; every role's tabs and landing page; the whole care path through the screens (intake, call, quick check, consult, referral, accept, booking, attendance, result, plan, closure); send back and re-route; low understanding and the navigator's call; hand-over accepted and declined; exception closure approved and sent back; message delivery; sign-out leaks, safe retries, offline, "not on your list"; axe accessibility checks on **every screen and dialog** at two widths with colour contrast on; keyboard-only use and focus trapping |
 | **Load check** (`npm run load-check`) | 50 signed-in clients, 2,000 open cases, 5 clients saving: latency percentiles and error counts |
 
 The browser tests use their own database and ports. They write screenshots into `docs/design/compare/` only when `SAVE_SCREENSHOTS=1` is set. The continuous-integration workflow (`.github/workflows/ci.yml`) runs every gate on each push and a weekly dependency audit.
@@ -607,7 +607,6 @@ docs/                     Guides (below) and the exported design frames in docs/
 - The load check was run on a development machine, not on production hardware.
 - The FHIR export is an unvalidated outline, not a live integration.
 - Appointment times are entered by staff; patients do not choose from offered slots.
-- Receiving services are created and disabled through the clinic lead's routes (`/api/admin/services`); there is no screen for it yet.
 - Seven moderate advisories exist in development-only linting tools, with no patched release; nothing from them ships (`docs/security.md`).
 
 ---
