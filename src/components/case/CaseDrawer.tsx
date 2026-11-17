@@ -9,6 +9,7 @@ import { LANGS } from '@/lib/i18n';
 import { toFhirBundle, downloadJson } from '@/lib/fhir';
 import { Btn, Badge, UrgencyBadge, PathwayBadge, SlaPill, SectionTitle, inputCls, cx } from '../ui';
 import { NextAction } from './NextAction';
+import { ExplanationCard } from './ExplanationCard';
 import { ClosureGate } from './ClosureGate';
 import {
   X, FileJson, Users, ShieldAlert, MessageSquare, History, CheckCircle2, Circle, AlertTriangle, ArrowRightLeft, Stethoscope, Smartphone, Languages, HeartHandshake,
@@ -77,6 +78,7 @@ export function CaseDrawer() {
                 <div className="space-y-4">
                   <NextAction key={`${c.id}-${currentStep(c)?.id}`} c={c} />
                   <Escalations c={c} />
+                  <ExplanationCard key={`${c.id}-${c.explanation?.draftedAt}-${c.explanation?.status}`} c={c} />
                   <PatientVoice c={c} />
                   <ClosureGate key={`${c.id}-${currentStep(c)?.id}-${c.closure?.status}`} c={c} />
                 </div>

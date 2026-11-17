@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useReducer, useRef } from 'react';
-import { Case, Channel, Closure, DelayReason, Lang, Role, StepId, Toast, Escalation } from '@/types/halqa';
+import { Case, Channel, Explanation, Closure, DelayReason, Lang, Role, StepId, Toast, Escalation } from '@/types/halqa';
 import { seedCases, DEMO_START, makeIncoming } from '@/lib/seed';
 import { runEngine, uid, currentStep, pathwayOf, actorFor } from '@/lib/engine';
 import { HOUR, PEOPLE, SPECIALIST_SERVICES, URGENCY_FACTOR } from '@/lib/pathways';
@@ -64,6 +64,9 @@ export type Action =
   | { type: 'DISMISS_TOAST'; id: string }
   | { type: 'NOTIFY'; id: string; channel: Channel; phoneOutcome?: 'REACHED' | 'NO_ANSWER'; note?: string }
   | { type: 'PATIENT_ACK'; id: string; q1: boolean; q2: boolean; confidence: number; lang: Lang }
+  | { type: 'EXPLANATION_DRAFT'; id: string; draft: Pick<Explanation, 'lang' | 'body' | 'next' | 'backTranslation' | 'reviewNotes' | 'model'> }
+  | { type: 'EXPLANATION_APPROVE'; id: string; body: string; next: string }
+  | { type: 'EXPLANATION_DISCARD'; id: string }
   | { type: 'STAFF_ACK'; id: string; note: string }
   | { type: 'CALLBACK_REQUEST'; id: string }
   | { type: 'CALLBACK_DONE'; id: string; note: string }
@@ -193,6 +196,21 @@ function caseReducer(c: Case, a: Action, s: State): { c: Case; toast?: { tone: T
         delayReasons: [...x.delayReasons, { at: now, reason: 'LOW_UNDERSTANDING' }],
       };
       return { c: x, toast: good ? { tone: 'success', text: `${c.patient.name} confirmed understanding (${a.confidence}/5 confidence)` } : { tone: 'warn', text: `${c.patient.name}: low understanding — navigator call task created` } };
+    }
+    case 'EXPLANATION_DRAFT': {
+      const x: Case = { ...c, explanation: { ...a.draft, draftedAt: now, requestedBy: actor.name, status: 'DRAFT' } };
+      return { c: log(x, `AI drafted a personalised explanation (${a.draft.lang.toUpperCase()}) — awaiting clinician review`, `Model ${a.draft.model}. Not visible to the patient until approved.`), toast: { tone: 'info', text: `Draft explanation ready for review · ${c.patient.name}` } };
+    }
+    case 'EXPLANATION_APPROVE': {
+      if (!c.explanation || !actor.licence) return null; // only a licensed clinician can publish to the patient
+      const edited = a.body !== c.explanation.body || a.next !== c.explanation.next;
+      const x: Case = { ...c, explanation: { ...c.explanation, body: a.body, next: a.next, edited: edited || c.explanation.edited, status: 'APPROVED', approvedBy: actor.name, approvedLicence: actor.licence, approvedAt: now } };
+      return { c: log(x, `Personalised explanation approved and published to patient (${c.explanation.lang.toUpperCase()})`, `${edited ? 'Edited by clinician before approval' : 'Approved without edits'} · licence ${actor.licence}`), toast: { tone: 'success', text: `Explanation published to ${c.patient.name}` } };
+    }
+    case 'EXPLANATION_DISCARD': {
+      if (!c.explanation) return null;
+      const was = c.explanation.status;
+      return { c: log({ ...c, explanation: undefined }, was === 'APPROVED' ? 'Personalised explanation withdrawn — patient sees the standard explanation' : 'AI draft explanation discarded'), toast: { tone: 'info', text: 'Standard explanation in use' } };
     }
     case 'STAFF_ACK': {
       let x = complete(c, 'ACK', a.note);

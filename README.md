@@ -13,6 +13,16 @@ npm run dev
 
 Open http://localhost:3000. Requires Node 18+.
 
+### Optional: AI-drafted explanations
+
+The case drawer can draft a result-specific patient explanation with Claude, which a licensed clinician must edit and approve before the patient sees it. To enable it, set an Anthropic API key on the server before starting:
+
+```bash
+export ANTHROPIC_API_KEY=your-key
+```
+
+On Vercel, add `ANTHROPIC_API_KEY` under Project Settings → Environment Variables. Without a key everything else works and the standard explanations stay in use. Only the result, pathway, language, age and sex are sent; no name, MRN or phone number.
+
 For the smoothest live demo, use a production build (no compile delays):
 
 ```bash
@@ -26,6 +36,7 @@ npm start
 |---|---|
 | **Command Centre** | Every open actionable result, ranked by risk. Queues: *Needs action now, Overdue, Unassigned, Rejected/returned, Patient requests*. Pipeline shows where every result is. Click any row to open the case. |
 | **Case drawer** | End-to-end journey (result → notify → understand → consult → refer → accept → book → diagnostic → result → care plan → closed) with time vs target per step, the current owner, the next action form, escalations, e-consult and patient messaging, closure gate, append-only audit trail, FHIR R4 export. |
+| **AI-drafted explanation** (in the case drawer) | Claude drafts a plain-language explanation of *this* result in the patient's language, with an English back-translation and review notes for the clinician. A navigator can request a draft; only a licensed clinician can edit, approve and publish it. Every step is in the audit trail, and the patient app shows who reviewed it. Needs `ANTHROPIC_API_KEY`. |
 | **Specialist Inbox** | Referrals must be **accepted** (custody confirmed) or **rejected with a reason**. Rejections bounce back to the GP automatically. Clinician-to-clinician e-consult questions. |
 | **Patient App** | Phone mock-up in **English, Arabic, Hindi, Urdu** (RTL supported). Privacy-safe SMS, plain-language explanation, **read-aloud**, **teach-back** understanding check + confidence score, journey tracker, self-booking, call-back, interpreter request, messaging. |
 | **Impact** | All measures from the brief computed live: time to notification / diagnostic / care, referral & appointment completion, documented closure, SLA compliance per step, delay & drop-off reasons, patient understanding & confidence. Compared against published usual-care figures, with sources cited on screen. CSV export. |
@@ -45,6 +56,7 @@ src/
   lib/seed.ts             12 storytelling cases + 56 historical cases (seeded RNG) + incoming templates
   lib/i18n.ts             Patient content in EN / AR / HI / UR
   lib/fhir.ts             FHIR R4 Bundle export (Patient, DiagnosticReport, ServiceRequest, Task, Communication, Appointment, Provenance)
+  app/api/draft-explanation/route.ts   Server route: calls Claude for a draft explanation (structured output, no patient identifiers)
   lib/fhirIngest.ts       FHIR R4 Bundle import: validation, LOINC → pathway map, urgency rules, duplicate detection, sample bundles
   context/HalqaStore.tsx  Reducer with every action, simulation clock, persistence
   components/…            Views (CommandCentre, SpecialistInbox, PatientApp, ImpactDashboard, Governance, case/*)
@@ -56,4 +68,5 @@ The original v1 source is saved in `halqa-v1-backup.zip`.
 - SLA targets, urgency thresholds, the LOINC code map and outcome mixes are **illustrative defaults**. Replace them with programme / DoH standards.
 - Baseline figures come from published studies of usual care in US health systems (Issaka 2017, Casalino 2009, Atlas 2023; cited on the Impact tab). They are not local programme data, and the Halqa side of the comparison is simulated.
 - Translations are for demonstration. Clinical use requires certified medical translation and patient testing.
-- No authentication or backend. FHIR import and export run in the browser and show the target data contract; there is no live lab or HIE connection.
+- The AI draft route has no authentication or rate limiting. On a public deployment anyone who finds it can spend your API credit; set a spend limit on the key or remove the key after judging.
+- No authentication, and no backend beyond that one route. FHIR import and export run in the browser and show the target data contract; there is no live lab or HIE connection.
