@@ -22,7 +22,7 @@ export function ImpactDashboard() {
   const compare = [
     { label: 'Median days result → diagnostic test', unit: 'd', ...BASELINE.medianDaysToDiagnostic, now: m.medianDaysToDiagnostic, better: 'lower' as const },
     { label: 'Diagnostic follow-up completed', unit: '%', ...BASELINE.diagnosticCompletionPct, now: m.referralCompletionPct, better: 'higher' as const },
-    { label: 'Patient informed of abnormal result', unit: '%', ...BASELINE.informedPct, now: m.notifiedPct, better: 'higher' as const },
+    { label: 'Patient notification documented', unit: '%', ...BASELINE.informedPct, now: m.notifiedPct, better: 'higher' as const },
   ];
 
   const exportCsv = () => {
