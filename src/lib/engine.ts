@@ -223,6 +223,7 @@ export interface Metrics {
   active: number;
   closed: number;
   closedWithEvidencePct: number;
+  notifiedPct: number;
   medianHoursToNotify: number;
   medianHoursToAck: number;
   medianDaysToConsult: number;
@@ -302,6 +303,7 @@ export function computeMetrics(cases: Case[], now: number, filter?: PathwayId | 
     active: active.length,
     closed: closed.length,
     closedWithEvidencePct: closed.length ? (100 * closed.filter((c) => c.closure?.evidenceRef && c.closure.signedLicence).length) / closed.length : 0,
+    notifiedPct: cs.length ? (100 * cs.filter((c) => c.steps.NOTIFY?.completedAt).length) / cs.length : 0,
     medianHoursToNotify: hrs(cs.map((c) => timeTo(c, 'NOTIFY'))),
     medianHoursToAck: hrs(cs.map((c) => timeTo(c, 'ACK'))),
     medianDaysToConsult: days(cs.map((c) => timeTo(c, 'CONSULT'))),

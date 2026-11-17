@@ -1,13 +1,14 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useHalqa, View } from '@/context/HalqaStore';
 import { fmtDateTime, actionItems, isClosed } from '@/lib/engine';
 import { ACTING_AS, ROLE_LABEL } from '@/lib/pathways';
-import { Role } from '@/types/halqa';
+import { Role, Toast } from '@/types/halqa';
 import { cx } from './ui';
+import { FhirImport } from './FhirImport';
 import {
-  LayoutDashboard, Inbox, Smartphone, BarChart3, ShieldCheck, Play, Pause, FastForward, RotateCcw, FlaskConical, Clock3,
+  FileJson, LayoutDashboard, Inbox, Smartphone, BarChart3, ShieldCheck, Play, Pause, FastForward, RotateCcw, FlaskConical, Clock3,
 } from 'lucide-react';
 
 const TABS: { id: View; label: string; icon: React.ReactNode }[] = [
@@ -22,11 +23,13 @@ const ROLES: Role[] = ['NAVIGATOR', 'PCP', 'SPECIALIST', 'LEAD'];
 
 export function Header() {
   const { s, d } = useHalqa();
+  const [fhirOpen, setFhirOpen] = useState(false);
   const needs = s.cases.filter((c) => !isClosed(c) && actionItems(c, s.now).some((i) => i.severity >= 2)).length;
   const inbox = s.cases.filter((c) => c.referral?.status === 'SENT' || [...c.messages].reverse().find((m) => m.thread === 'ECONSULT')?.fromRole === 'PCP').filter((c) => !isClosed(c)).length;
   const approvals = s.cases.filter((c) => c.closure?.status === 'PENDING_APPROVAL').length;
 
   return (
+    <>
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200">
       <div className="max-w-[1400px] mx-auto px-4 lg:px-6">
         <div className="flex items-center justify-between gap-4 h-14">
@@ -83,6 +86,9 @@ export function Header() {
           <button onClick={() => d({ type: 'INGEST' })} className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-teal-600 hover:bg-teal-500 text-white font-semibold whitespace-nowrap">
             <FlaskConical className="w-3.5 h-3.5" />Simulate incoming lab result
           </button>
+          <button onClick={() => setFhirOpen(true)} className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold whitespace-nowrap">
+            <FileJson className="w-3.5 h-3.5" />Import FHIR result
+          </button>
           <button onClick={() => { if (confirm('Reset the demo to its starting state?')) d({ type: 'RESET' }); }} className="flex items-center gap-1 px-2 py-1 rounded hover:bg-slate-800 text-slate-400 whitespace-nowrap">
             <RotateCcw className="w-3.5 h-3.5" />Reset
           </button>
@@ -93,26 +99,35 @@ export function Header() {
         </div>
       </div>
     </header>
+    {fhirOpen && <FhirImport onClose={() => setFhirOpen(false)} />}
+    </>
   );
 }
 
-export function Toasts() {
-  const { s, d } = useHalqa();
+const TOAST_TONE = { info: 'border-sky-300 bg-sky-50 text-sky-900', warn: 'border-amber-300 bg-amber-50 text-amber-900', danger: 'border-rose-300 bg-rose-50 text-rose-900', success: 'border-emerald-300 bg-emerald-50 text-emerald-900' };
+
+function ToastItem({ t }: { t: Toast }) {
+  const { d } = useHalqa();
+  // Each toast runs its own timer, so a burst clears together instead of one every few seconds.
   React.useEffect(() => {
-    if (!s.toasts.length) return;
-    const h = setTimeout(() => d({ type: 'DISMISS_TOAST', id: s.toasts[0].id }), 5500);
+    const h = setTimeout(() => d({ type: 'DISMISS_TOAST', id: t.id }), 5000);
     return () => clearTimeout(h);
-  }, [s.toasts, d]);
-  const tone = { info: 'border-sky-300 bg-sky-50 text-sky-900', warn: 'border-amber-300 bg-amber-50 text-amber-900', danger: 'border-rose-300 bg-rose-50 text-rose-900', success: 'border-emerald-300 bg-emerald-50 text-emerald-900' };
+  }, [t.id, d]);
   return (
-    <div className="fixed bottom-4 right-4 z-[60] space-y-2 w-[360px] max-w-[calc(100vw-2rem)]">
-      {s.toasts.map((t) => (
-        <div key={t.id} className={cx('border rounded-xl px-3 py-2.5 text-xs shadow-lg flex items-start gap-2 animate-[slidein_.25s_ease-out]', tone[t.tone])}>
-          <div className="flex-1">{t.text}</div>
-          {t.caseId && <button onClick={() => { d({ type: 'VIEW', view: 'command' }); d({ type: 'SELECT', id: t.caseId! }); d({ type: 'DISMISS_TOAST', id: t.id }); }} className="font-semibold underline whitespace-nowrap">Open</button>}
-          <button onClick={() => d({ type: 'DISMISS_TOAST', id: t.id })} className="opacity-50 hover:opacity-100">✕</button>
-        </div>
-      ))}
+    <div role="status" className={cx('pointer-events-auto border rounded-xl px-3 py-2.5 text-xs shadow-lg flex items-start gap-2 animate-[slidein_.25s_ease-out]', TOAST_TONE[t.tone])}>
+      <div className="flex-1">{t.text}</div>
+      {t.caseId && <button onClick={() => { d({ type: 'VIEW', view: 'command' }); d({ type: 'SELECT', id: t.caseId! }); d({ type: 'DISMISS_TOAST', id: t.id }); }} className="font-semibold underline whitespace-nowrap">Open</button>}
+      <button aria-label="Dismiss" onClick={() => d({ type: 'DISMISS_TOAST', id: t.id })} className="opacity-50 hover:opacity-100">✕</button>
+    </div>
+  );
+}
+
+/** Toasts sit top-left under the header: the case drawer opens on the right, so they never cover its controls. */
+export function Toasts() {
+  const { s } = useHalqa();
+  return (
+    <div className="pointer-events-none fixed top-28 left-4 z-[60] space-y-2 w-[340px] max-w-[calc(100vw-2rem)]">
+      {s.toasts.map((t) => <ToastItem key={t.id} t={t} />)}
     </div>
   );
 }

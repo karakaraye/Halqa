@@ -4,7 +4,7 @@ import React, { createContext, useContext, useEffect, useReducer, useRef } from 
 import { Case, Channel, Closure, DelayReason, Lang, Role, StepId, Toast, Escalation } from '@/types/halqa';
 import { seedCases, DEMO_START, makeIncoming } from '@/lib/seed';
 import { runEngine, uid, currentStep, pathwayOf, actorFor } from '@/lib/engine';
-import { HOUR, PEOPLE, SPECIALIST_SERVICES } from '@/lib/pathways';
+import { HOUR, PEOPLE, SPECIALIST_SERVICES, URGENCY_FACTOR } from '@/lib/pathways';
 
 export type View = 'command' | 'specialist' | 'patient' | 'impact' | 'governance';
 
@@ -19,9 +19,11 @@ export interface State {
   toasts: Toast[];
   playing: boolean;
   ingestSeq: number;
+  /** count of cases opened from imported FHIR bundles (separate so the scripted demo order is unaffected) */
+  fhirSeq?: number;
 }
 
-const VERSION = 3;
+const VERSION = 4;
 
 export function initialState(): State {
   return {
@@ -54,6 +56,7 @@ export type Action =
   | { type: 'RESET' }
   | { type: 'LOAD'; state: State }
   | { type: 'INGEST' }
+  | { type: 'INGEST_FHIR'; c: Case }
   | { type: 'SELECT'; id: string | null }
   | { type: 'VIEW'; view: View }
   | { type: 'ROLE'; role: Role }
@@ -80,7 +83,32 @@ export type Action =
   | { type: 'DELAY'; id: string; reason: DelayReason; note?: string };
 
 function toast(s: State, tone: Toast['tone'], text: string, caseId?: string): Toast[] {
-  return [...s.toasts, { id: uid('t'), at: s.now, tone, text, caseId }].slice(-5);
+  return [...s.toasts, { id: uid('t'), at: s.now, tone, text, caseId }].slice(-3);
+}
+
+/** Open a newly received result as a case: route it, apply the CRITICAL phone-first rule, run the rules engine. */
+function openCase(s: State, c0: Case, counters: Partial<State>): State {
+  let c = c0;
+  const critical = c.urgency === 'CRITICAL';
+  if (!critical && c.patient.phoneReachable) {
+    // Low-friction default: auto-send a privacy-safe message in the patient's language
+    const ch = c.patient.preferredChannel === 'PHONE' ? 'SMS' : c.patient.preferredChannel;
+    c = {
+      ...c,
+      notifications: [{ at: s.now + 2 * 60_000, channel: ch, lang: c.patient.lang, status: 'DELIVERED', by: 'Halqa messaging' }],
+      steps: { NOTIFY: { completedAt: s.now + 2 * 60_000, by: 'Halqa messaging', note: `${ch} delivered (${c.patient.lang.toUpperCase()})` } },
+      audit: [...c.audit, { at: s.now + 2 * 60_000, actor: 'Halqa messaging', action: `Result notice sent by ${ch} in ${c.patient.lang.toUpperCase()}`, detail: 'Privacy-safe message: no diagnosis in SMS; secure link + call-back option', system: true }],
+    };
+  } else if (critical) {
+    const sla = Math.round((pathwayOf(c).steps[0].slaHours * URGENCY_FACTOR.CRITICAL));
+    c = { ...c, audit: [...c.audit, { at: s.now + 60_000, actor: 'Halqa routing', action: 'CRITICAL result — digital message held until a nurse phones the patient', detail: `Task created for ${c.team.NAVIGATOR?.name}; SLA ${sla}h`, system: true }] };
+  }
+  c = runEngine(c, s.now).next;
+  const owners = [c.team.NAVIGATOR?.name, c.team.PCP?.name ?? 'no registered GP (flagged)'].join(' & ');
+  return {
+    ...s, ...counters, cases: [c, ...s.cases], selectedId: c.id, patientCaseId: c.id,
+    toasts: toast(s, critical ? 'danger' : 'info', `New ${critical ? 'CRITICAL ' : ''}result: ${c.id} ${c.patient.name} — ${c.resultCode}. Routed to ${owners}.`, c.id),
+  };
 }
 
 function reducer(s: State, a: Action): State {
@@ -97,30 +125,22 @@ function reducer(s: State, a: Action): State {
       const now = s.now + a.hours * HOUR;
       const { cases, created } = runAll(s.cases, now);
       let toasts = s.toasts;
-      for (const { c, e } of created.slice(0, 4))
-        toasts = [...toasts, { id: uid('t'), at: now, tone: e.level >= 2 ? 'danger' : 'warn', text: `L${e.level} escalation · ${c.id} ${c.patient.name}: ${e.reason}`, caseId: c.id } as Toast].slice(-5);
+      if (created.length === 1) {
+        const { c, e } = created[0];
+        toasts = [...toasts, { id: uid('t'), at: now, tone: e.level >= 2 ? 'danger' : 'warn', text: `L${e.level} escalation · ${c.id} ${c.patient.name}: ${e.reason}`, caseId: c.id } as Toast];
+      } else if (created.length > 1) {
+        // One summary instead of a stack that hides the screen behind it
+        const l2 = created.filter((x) => x.e.level >= 2).length;
+        const n = new Set(created.map((x) => x.c.id)).size;
+        toasts = [...toasts, { id: uid('t'), at: now, tone: l2 ? 'danger' : 'warn', text: `${created.length} new escalations across ${n} case${n > 1 ? 's' : ''}${l2 ? ` · ${l2} at Level 2` : ''}. See the Overdue queue.` } as Toast];
+      }
+      toasts = toasts.slice(-3);
       return { ...s, now, cases, toasts };
     }
-    case 'INGEST': {
-      const c0 = makeIncoming(s.ingestSeq, s.now, s.ingestSeq + 1);
-      let c = c0;
-      const critical = c.urgency === 'CRITICAL';
-      if (!critical) {
-        // Low-friction default: auto-send a privacy-safe message in the patient's language
-        const ch = c.patient.preferredChannel === 'PHONE' ? 'SMS' : c.patient.preferredChannel;
-        c = {
-          ...c,
-          notifications: [{ at: s.now + 2 * 60_000, channel: ch, lang: c.patient.lang, status: 'DELIVERED', by: 'Halqa messaging' }],
-          steps: { NOTIFY: { completedAt: s.now + 2 * 60_000, by: 'Halqa messaging', note: `${ch} delivered (${c.patient.lang.toUpperCase()})` } },
-          audit: [...c.audit, { at: s.now + 2 * 60_000, actor: 'Halqa messaging', action: `Result notice sent by ${ch} in ${c.patient.lang.toUpperCase()}`, detail: 'Privacy-safe message: no diagnosis in SMS; secure link + call-back option', system: true }],
-        };
-      } else {
-        c = { ...c, audit: [...c.audit, { at: s.now + 60_000, actor: 'Halqa routing', action: 'CRITICAL result — digital message held until a nurse phones the patient', detail: `Task created for ${c.team.NAVIGATOR?.name}; SLA ${12}h`, system: true }] };
-      }
-      return {
-        ...s, cases: [c, ...s.cases], ingestSeq: s.ingestSeq + 1, selectedId: c.id, patientCaseId: c.id,
-        toasts: toast(s, critical ? 'danger' : 'info', `New ${critical ? 'CRITICAL ' : ''}result: ${c.id} ${c.patient.name} — ${c.resultCode}. Routed to ${c.team.NAVIGATOR?.name} & ${c.team.PCP?.name}.`, c.id),
-      };
+    case 'INGEST': return openCase(s, makeIncoming(s.ingestSeq, s.now, s.ingestSeq + 1), { ingestSeq: s.ingestSeq + 1 });
+    case 'INGEST_FHIR': {
+      const n = s.fhirSeq ?? 0;
+      return openCase(s, { ...a.c, id: `HQ-${2001 + n}` }, { fhirSeq: n + 1 });
     }
   }
   // Case-level actions

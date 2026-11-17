@@ -18,6 +18,7 @@ Click **Judge demo walkthrough** (bottom-left) and press **Show me** on each ste
 
 | # | Click | Say | Criterion |
 |---|---|---|---|
+| 0 | *(optional)* **Import FHIR result** in the dark bar | “This is the real integration point. A lab sends a FHIR bundle; Halqa maps the code to a pathway, sets urgency, finds the GP, and refuses duplicates and non-final results.” | 1 |
 | 1 | Step 1 | “A positive FIT just arrived. In seconds Halqa routed it to a navigator and an accountable GP. It’s CRITICAL, so the text message is held until a human calls.” Click **Called — patient reached**. | 1, 2, 5 |
 | 2 | Step 2 | “Priya speaks Hindi. She gets a WhatsApp with no diagnosis in it, reads or listens to the explanation, then answers two teach-back questions.” Answer them and confirm, then point to the live care-team feed on the right. | 3 |
 | 3 | Step 3 | “The specialist must accept custody, or reject with a reason.” Click **Accept custody**. | 4 |
@@ -47,8 +48,8 @@ Click **Judge demo walkthrough** (bottom-left) and press **Show me** on each ste
 - **Standards-native.** Built on the FHIR R4 Task / ServiceRequest / Communication / Provenance model, so it plugs into HIE and EHR infrastructure.
 
 ## Likely judge questions
-- **“Is this real data?”** No. It’s a simulated cohort of 68 cases on a simulated clock, and every number on the Impact tab is computed from it live. Baseline numbers are placeholders we would replace with programme audit data in a pilot.
-- **“How does it integrate?”** It consumes DiagnosticReport results from the lab or HIE, writes Task/ServiceRequest/Appointment back, and exports a FHIR bundle per case (click FHIR in any case).
+- **“Is this real data?”** No. It’s a simulated cohort of 68 cases on a simulated clock, and every Halqa number on the Impact tab is computed from it live. The usual-care side is published: in a US safety-net system only 55.6% of positive FITs got a colonoscopy within a year, at a median of 184 days (Issaka 2017); 7.1% of abnormal outpatient results were never communicated (Casalino 2009); and in a 44-practice trial EHR reminders alone did nothing, 22.7% vs 22.9% follow-up at 120 days (Atlas, JAMA 2023). A pilot would replace both sides with local audit data.
+- **“How does it integrate?”** Show it: **Import FHIR result** parses a FHIR R4 Bundle into an owned case, and **FHIR** in any case exports Patient / DiagnosticReport / ServiceRequest / Task / Communication / Appointment / Provenance. Re-importing an export is rejected as a duplicate. In the prototype this runs in the browser; a live lab or HIE feed would call the same parser.
 - **“What about AI?”** Deliberately rules-based for safety and explainability. Next step: an AI-drafted, clinician-approved plain-language explanation for unusual results, and no-show risk prediction to target navigator outreach. Both stay human-approved.
 - **“Who pays / who uses it?”** Screening programme owners and payers (fewer late-stage diagnoses), provider networks (SLA compliance, quality metrics), navigators and clinicians (one worklist instead of phone, fax and spreadsheets).
 - **“What if the patient has no smartphone?”** Phone-first navigator workflow, SMS with a reply-for-call-back option, and teach-back recorded by phone. The app is optional.

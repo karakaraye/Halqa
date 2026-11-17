@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { useHalqa } from '@/context/HalqaStore';
 import { computeMetrics, DELAY_LABEL } from '@/lib/engine';
-import { BASELINE, PATHWAY_LIST } from '@/lib/pathways';
+import { BASELINE, BASELINE_CONTEXT, PATHWAY_LIST, SOURCES } from '@/lib/pathways';
 import { PathwayId } from '@/types/halqa';
 import { Card, Badge, cx, inputCls, Btn } from './ui';
 import { TrendingDown, ShieldCheck, Clock, HeartHandshake, AlertOctagon, Download, Info } from 'lucide-react';
@@ -20,15 +20,15 @@ export function ImpactDashboard() {
   const m = useMemo(() => computeMetrics(s.cases, s.now, pw), [s.cases, s.now, pw]);
 
   const compare = [
-    { label: 'Median time to patient notification', unit: 'h', base: BASELINE.medianHoursToNotify, now: m.medianHoursToNotify, better: 'lower' as const },
-    { label: 'Median days result → diagnostic test', unit: 'd', base: BASELINE.medianDaysToDiagnostic, now: m.medianDaysToDiagnostic, better: 'lower' as const },
-    { label: 'Referral → diagnostic completion', unit: '%', base: BASELINE.referralCompletionPct, now: m.referralCompletionPct, better: 'higher' as const },
-    { label: 'Cases with documented closure', unit: '%', base: BASELINE.documentedClosurePct, now: (100 * m.closed) / Math.max(1, m.total), better: 'higher' as const },
-    { label: 'Patient confidence navigating care', unit: '/5', base: BASELINE.patientConfidence, now: m.avgConfidence, better: 'higher' as const },
+    { label: 'Median days result → diagnostic test', unit: 'd', ...BASELINE.medianDaysToDiagnostic, now: m.medianDaysToDiagnostic, better: 'lower' as const },
+    { label: 'Diagnostic follow-up completed', unit: '%', ...BASELINE.diagnosticCompletionPct, now: m.referralCompletionPct, better: 'higher' as const },
+    { label: 'Patient informed of abnormal result', unit: '%', ...BASELINE.informedPct, now: m.notifiedPct, better: 'higher' as const },
   ];
 
   const exportCsv = () => {
-    const rows = [['metric', 'baseline', 'halqa'], ...compare.map((c) => [c.label, c.base, c.now.toFixed(2)]),
+    const q = (x: string) => `"${x.replace(/"/g, '""')}"`;
+    const rows = [['metric', 'published_baseline', 'halqa_simulated', 'baseline_source'], ...compare.map((c) => [q(c.label), c.value, c.now.toFixed(2), q(c.source.cite)]),
+      ['Median hours to notification', '', m.medianHoursToNotify.toFixed(1)], ['Patient confidence /5', '', m.avgConfidence.toFixed(2)], ['Documented closure %', '', ((100 * m.closed) / Math.max(1, m.total)).toFixed(1)],
       ['SLA compliance %', '', m.slaCompliancePct.toFixed(1)], ['Referral acceptance %', '', m.referralAcceptPct.toFixed(1)], ['First-time attendance %', '', m.attendancePct.toFixed(1)],
       ['Teach-back understood %', '', m.understandingPct.toFixed(1)], ['Unresolved actionable results', '', m.unresolved], ['Unresolved overdue', '', m.unresolvedOverdue]];
     const blob = new Blob([rows.map((r) => r.join(',')).join('\n')], { type: 'text/csv' });
@@ -40,7 +40,7 @@ export function ImpactDashboard() {
       <Card className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
           <h2 className="font-bold text-slate-900 text-lg">Closure & patient-impact measures</h2>
-          <p className="text-xs text-slate-500 flex items-center gap-1"><Info className="w-3.5 h-3.5" />Computed live from {m.total} cases ({m.closed} closed, {m.active} open) in this simulation. Baseline figures are illustrative placeholders — replace with programme audit data.</p>
+          <p className="text-xs text-slate-500 flex items-center gap-1"><Info className="w-3.5 h-3.5" />Computed live from {m.total} cases ({m.closed} closed, {m.active} open) in this simulation. Halqa figures are simulated; baselines are published usual-care studies (sources below).</p>
         </div>
         <div className="flex gap-2">
           <select value={pw} onChange={(e) => setPw(e.target.value as PathwayId | 'ALL')} className={cx(inputCls, 'text-xs w-auto')}>
@@ -61,26 +61,36 @@ export function ImpactDashboard() {
 
       <div className="grid xl:grid-cols-2 gap-4">
         <Card className="p-4">
-          <ChartTitle title="Before vs with Halqa" sub="Lower is better for times; higher is better for rates" legend={[{ c: GRAY, l: 'Baseline (illustrative)' }, { c: TEAL, l: 'Halqa (simulated, live)' }]} />
+          <ChartTitle title="Usual care vs with Halqa" sub="Lower is better for times; higher is better for rates" legend={[{ c: GRAY, l: 'Published usual care' }, { c: TEAL, l: 'Halqa (simulated, live)' }]} />
           <div className="space-y-3.5 mt-3">
             {compare.map((row) => {
-              const max = Math.max(row.base, row.now, row.unit === '%' ? 100 : row.unit === '/5' ? 5 : 0) || 1;
-              const delta = row.better === 'lower' ? ((row.base - row.now) / row.base) * 100 : row.now - row.base;
+              const max = Math.max(row.value, row.now, row.unit === '%' ? 100 : 0) || 1;
+              const delta = row.better === 'lower' ? ((row.value - row.now) / row.value) * 100 : row.now - row.value;
               return (
                 <div key={row.label}>
                   <div className="flex justify-between text-xs mb-1">
                     <span className="font-medium text-slate-700">{row.label}</span>
                     <span className="font-semibold text-slate-900">
-                      {row.better === 'lower' ? `${f0(delta)}% faster` : row.unit === '/5' ? `+${f1(delta)}` : `+${f0(delta)} pts`}
+                      {row.better === 'lower' ? `${f0(delta)}% faster` : `${delta >= 0 ? '+' : ''}${f0(delta)} pts`}
                     </span>
                   </div>
-                  <Bar value={row.base} max={max} color={GRAY} label={`${f1(row.base)}${row.unit}`} title={`Baseline: ${f1(row.base)}${row.unit}`} />
+                  <Bar value={row.value} max={max} color={GRAY} label={`${f1(row.value)}${row.unit}`} title={`Published usual care: ${f1(row.value)}${row.unit}`} />
                   <div className="h-0.5" />
                   <Bar value={row.now} max={max} color={TEAL} label={`${f1(row.now)}${row.unit}`} title={`Halqa: ${f1(row.now)}${row.unit}`} />
+                  <div className="text-[11px] text-slate-500 mt-1">Usual care: {row.scope} <sup>[{row.source.id}]</sup></div>
                 </div>
               );
             })}
           </div>
+          <div className="mt-4 text-xs text-slate-700 bg-slate-50 border border-slate-200 rounded-lg p-2.5">
+            <span className="font-semibold">Why reminders are not enough: </span>{BASELINE_CONTEXT.text} <sup>[{BASELINE_CONTEXT.source.id}]</sup>
+          </div>
+          <ol className="mt-3 space-y-1 text-[11px] text-slate-500">
+            {Object.values(SOURCES).map((src) => (
+              <li key={src.id}>[{src.id}] {src.cite} <a href={src.url} target="_blank" rel="noreferrer" className="text-teal-700 underline">link</a></li>
+            ))}
+          </ol>
+          <p className="mt-2 text-[11px] text-slate-500">Baselines come from US health systems, not local programme data. The comparison shows the size of the gap Halqa targets, not a measured effect; a pilot would replace both sides with audit data.</p>
         </Card>
 
         <Card className="p-4">

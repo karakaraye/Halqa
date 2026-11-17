@@ -156,6 +156,8 @@ export interface Case {
   resultCode: string;
   urgency: Urgency;
   sourceLab: string;
+  /** identifier of the source FHIR DiagnosticReport — used to reject duplicate deliveries */
+  sourceRef?: string;
   issuedAt: number;
 
   team: Partial<Record<'NAVIGATOR' | 'PCP' | 'SPECIALIST', Person>>;

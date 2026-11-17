@@ -206,7 +206,7 @@ function hand(): Case[] {
     done(c, 'ATTEND', 20 * 24, PEOPLE.sp_lina.name, 'Colposcopy + directed biopsy', 'Colposcopy performed');
     c.outcomeCategory = 'PRECANCER';
     done(c, 'OUTCOME', 15 * 24, PEOPLE.sp_lina.name, 'Histology CIN2 (report HIS-26-55120)', 'Diagnostic result recorded');
-    done(c, 'CARE_PLAN', 6 * 24, PEOPLE.sp_lina.name, 'LLETZ performed; test-of-cure HPV at 6 months', 'Treatment completed / surveillance scheduled');
+    done(c, 'CARE_PLAN', 4 * 24, PEOPLE.sp_lina.name, 'LLETZ performed; test-of-cure HPV at 6 months', 'Treatment completed / surveillance scheduled');
     c.messages.push({ id: 'm9a', at: T(5 * 24), thread: 'ECONSULT', from: PEOPLE.sp_lina.name, fromRole: 'SPECIALIST', text: 'LLETZ done, margins clear. Please arrange test-of-cure HPV in 6 months at primary care and close the loop.' });
     cases.push(c);
   }
