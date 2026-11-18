@@ -119,6 +119,23 @@ export interface Closure {
   justification?: string;
 }
 
+/** A result-specific patient explanation: drafted by AI, shown to the patient only after a clinician approves it. */
+export interface Explanation {
+  lang: Lang;
+  body: string;
+  next: string;
+  backTranslation: string;
+  reviewNotes: string[];
+  model: string;
+  draftedAt: number;
+  requestedBy: string;
+  status: 'DRAFT' | 'APPROVED';
+  edited?: boolean;
+  approvedBy?: string;
+  approvedLicence?: string;
+  approvedAt?: number;
+}
+
 export interface AuditEntry {
   at: number;
   actor: string;
@@ -156,6 +173,8 @@ export interface Case {
   resultCode: string;
   urgency: Urgency;
   sourceLab: string;
+  /** identifier of the source FHIR DiagnosticReport — used to reject duplicate deliveries */
+  sourceRef?: string;
   issuedAt: number;
 
   team: Partial<Record<'NAVIGATOR' | 'PCP' | 'SPECIALIST', Person>>;
@@ -172,6 +191,7 @@ export interface Case {
   messages: Message[];
   escalations: Escalation[];
   feedback?: PatientFeedback;
+  explanation?: Explanation;
   callbackRequestedAt?: number;
   callbackDoneAt?: number;
   delayReasons: { at: number; reason: DelayReason; note?: string }[];

@@ -51,7 +51,9 @@ function Phone({ c }: { c: Case }) {
   const [tab, setTab] = useState<'result' | 'journey' | 'help'>('result');
   const L = LANGS.find((l) => l.id === lang)!;
   const p = pathwayOf(c);
-  const ex = EXPLAIN[c.pathwayId][lang];
+  // A clinician-approved, result-specific explanation replaces the standard text in the language it was written in.
+  const approved = c.explanation?.status === 'APPROVED' && c.explanation.lang === lang ? c.explanation : null;
+  const ex = approved ? { body: approved.body, next: approved.next } : EXPLAIN[c.pathwayId][lang];
   const notified = !!c.steps.NOTIFY?.completedAt;
   const withinDays = Math.max(3, Math.round(p.targetDaysToDiagnosis * URGENCY_FACTOR[c.urgency]));
 
@@ -143,6 +145,7 @@ function ResultTab({ c, lang, ex, withinDays }: { c: Case; lang: Lang; ex: { bod
       </div>
       <div className="inline-flex items-center gap-1 text-[11px] font-bold text-teal-800 bg-teal-50 border border-teal-200 rounded-full px-2.5 py-0.5"><ShieldCheck className="w-3 h-3" />{t(lang, 'notDiagnosis')}</div>
       <p className="text-[13px] leading-relaxed text-slate-700">{ex.body}</p>
+      {c.explanation?.status === 'APPROVED' && c.explanation.lang === lang && <div className="text-[10px] text-slate-500 flex items-center gap-1" dir="ltr"><ShieldCheck className="w-3 h-3 text-teal-600" />Written for your result · reviewed by {c.explanation.approvedBy}</div>}
       <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3">
         <div className="text-[10px] font-bold uppercase text-amber-700">{t(lang, 'nextStep')}</div>
         <div className="font-bold text-slate-900">{ex.next}</div>

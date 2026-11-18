@@ -220,14 +220,28 @@ export const ACTING_AS: Record<Role, Person> = {
   PATIENT: { id: 'patient', name: 'Patient', role: 'PATIENT', org: 'Patient app' },
 };
 
-// ── Illustrative baseline for before/after comparison ─────────
-// Replace with the programme's own audit data. These are placeholder
-// figures representative of fragmented, manual follow-up.
+// ── Published baseline for the before/after comparison ────────
+// Figures from peer-reviewed studies of usual-care follow-up. They are
+// US settings, not local programme data: they size the gap Halqa targets
+// and should be replaced with the programme's own audit once available.
+export interface Source { id: string; cite: string; url: string }
+export const SOURCES: Record<'issaka' | 'casalino' | 'atlas', Source> = {
+  issaka: { id: '1', cite: 'Issaka RB et al. Inadequate utilization of diagnostic colonoscopy following abnormal FIT results in an integrated safety-net system. Am J Gastroenterol 2017;112(2):375–382. doi:10.1038/ajg.2016.555', url: 'https://pubmed.ncbi.nlm.nih.gov/28154400/' },
+  casalino: { id: '2', cite: 'Casalino LP et al. Frequency of failure to inform patients of clinically significant outpatient test results. Arch Intern Med 2009;169(12):1123–1129. PMID 19546413', url: 'https://pubmed.ncbi.nlm.nih.gov/19546413/' },
+  atlas: { id: '3', cite: 'Atlas SJ et al. A multilevel primary care intervention to improve follow-up of overdue abnormal cancer screening test results: a cluster randomized clinical trial. JAMA 2023;330(14):1348–1358. doi:10.1001/jama.2023.18755', url: 'https://doi.org/10.1001/jama.2023.18755' },
+};
+
 export const BASELINE = {
-  medianHoursToNotify: 120,
-  medianDaysToDiagnostic: 62,
-  referralCompletionPct: 68,
-  documentedClosurePct: 41,
-  unknownStatusPct: 27,
-  patientConfidence: 2.9,
+  /** Median days from positive FIT to colonoscopy, among patients who had one (n=2,238 positive FITs, 2012–15). */
+  medianDaysToDiagnostic: { value: 184, scope: 'positive FIT → colonoscopy, median (IQR 140–232)', source: SOURCES.issaka },
+  /** Share of positive-FIT patients completing colonoscopy within 1 year. */
+  diagnosticCompletionPct: { value: 55.6, scope: 'colonoscopy within 1 year of a positive FIT', source: SOURCES.issaka },
+  /** 135 of 1,889 abnormal results (7.1%) were apparent failures to inform the patient or to document informing them. */
+  informedPct: { value: 92.9, scope: '7.1% of abnormal outpatient results had no documented communication to the patient (135 of 1,889)', source: SOURCES.casalino },
+};
+
+/** Context finding shown beside the chart (not a like-for-like bar). */
+export const BASELINE_CONTEXT = {
+  text: 'In a 44-practice trial of 11,980 patients with overdue abnormal screening results, only 22.9% completed follow-up within 120 days under usual care. EHR reminders alone made no difference (22.7%); adding patient outreach and navigation reached 31.4%.',
+  source: SOURCES.atlas,
 };
