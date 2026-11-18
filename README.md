@@ -21,7 +21,7 @@ The case drawer can draft a result-specific patient explanation with Claude, whi
 export ANTHROPIC_API_KEY=your-key
 ```
 
-On Vercel, add `ANTHROPIC_API_KEY` under Project Settings → Environment Variables. Without a key everything else works and the standard explanations stay in use. Only the result, pathway, language, age and sex are sent; no name, MRN or phone number.
+On Vercel, add `ANTHROPIC_API_KEY` under Project Settings → Environment Variables. Step-by-step test instructions for teammates: [`docs/TEST-AI-DRAFT.md`](docs/TEST-AI-DRAFT.md). Without a key everything else works and the standard explanations stay in use. Only the result, pathway, language, age and sex are sent; no name, MRN or phone number.
 
 For the smoothest live demo, use a production build (no compile delays):
 
