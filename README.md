@@ -403,6 +403,8 @@ Full request and answer shapes are in [`docs/api.md`](docs/api.md).
 
 ## 11. Going live
 
+For the hackathon, see [Deploy the synthetic demo on Vercel](docs/hackathon-deploy.md).
+
 Work through [`docs/go-live-checklist.md`](docs/go-live-checklist.md) for the people-and-contract items. For the technical side, in short (details, service files and the restore procedure are in [`docs/operations.md`](docs/operations.md)):
 
 1. **Server:** one machine, Node 24, a durable local disk for `HALQA_DB_PATH`.

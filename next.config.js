@@ -6,6 +6,17 @@
  */
 const API_POLICY = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
 
+function apiOrigin() {
+  const value = process.env.HALQA_API_ORIGIN?.trim();
+  if (!value && !process.env.VERCEL) return;
+  const url = URL.canParse(value ?? '') ? new URL(value) : null;
+  if (!url || url.username || url.password || url.pathname !== '/' || url.search || url.hash
+      || (url.protocol !== 'https:' && (process.env.VERCEL || url.protocol !== 'http:' || url.hostname !== '127.0.0.1'))) {
+    throw new Error('HALQA_API_ORIGIN must be the HTTPS origin of the durable Halqa server.');
+  }
+  return url.origin;
+}
+
 function securityHeaders() {
   const headers = [
     { key: 'X-Frame-Options', value: 'DENY' },
@@ -24,6 +35,11 @@ function securityHeaders() {
 /** @type {import('next').NextConfig} */
 module.exports = {
   poweredByHeader: false,
+  outputFileTracingRoot: __dirname,
+  async rewrites() {
+    const origin = apiOrigin();
+    return { beforeFiles: origin ? [{ source: '/api/:path*', destination: `${origin}/api/:path*` }] : [] };
+  },
   async headers() {
     return [
       { source: '/:path*', headers: securityHeaders() },
