@@ -40,7 +40,11 @@ export function session(request:NextRequest,write=false,{duringPasswordChange=fa
 }
 export function sameOrigin(request:NextRequest) {
   const expected=process.env.HALQA_ORIGIN||process.env.RENDER_EXTERNAL_URL||request.nextUrl.origin;
-  if(request.headers.get('origin')!==expected) throw new HttpError(403,'Request origin is not permitted.');
+  const origin = request.headers.get('origin');
+  const demoFrontend = process.env.HALQA_DEMO_POSTGRES_URL && process.env.HALQA_DEMO_VERCEL_ORIGIN;
+  if (origin !== expected && (!demoFrontend || origin !== demoFrontend)) {
+    throw new HttpError(403, 'Request origin is not permitted.');
+  }
 }
 export async function body(request:NextRequest) {
   if(!request.headers.get('content-type')?.startsWith('application/json')) throw new HttpError(415,'Use JSON.');

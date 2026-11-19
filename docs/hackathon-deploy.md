@@ -14,7 +14,7 @@ A Postgres transaction serializes API operations and worker ticks across process
 ## Vercel frontend
 
 1. Use a Next.js project on Node 24, with `npm run build` and access to Vercel’s system environment variables.
-2. Choose an exact HTTPS hostname for the Vercel demo. Set `HALQA_ORIGIN` to that origin on **both** the Render API service and the Vercel deployment. On Vercel, also set `HALQA_API_ORIGIN` to the Render service’s HTTPS origin. Use origin URLs without trailing slashes.
-3. Deploy `main` in Vercel and open the configured hostname. Verify `/api/health`, sign in, and open a case. Once `HALQA_ORIGIN` is set to the Vercel hostname, use that hostname for browser sign-in. [Vercel deployment guide](https://vercel.com/docs/projects/deploy-from-cli)
+2. Choose an exact HTTPS hostname for the Vercel demo. On Vercel, set `HALQA_ORIGIN` to that origin and `HALQA_API_ORIGIN` to the Render service’s HTTPS origin. For the synthetic Postgres-backed deployment, set `HALQA_DEMO_VERCEL_ORIGIN` on Render to the same Vercel origin. This keeps the Render sign-in address available too. For a persistent-disk setup, set `HALQA_ORIGIN` on Render to the Vercel origin instead. Use origin URLs without trailing slashes.
+3. Deploy `main` in Vercel and open the configured hostname. Verify `/api/health`, sign in, and open a case. [Vercel deployment guide](https://vercel.com/docs/projects/deploy-from-cli)
 
 For a long-running installation with its own persistent SQLite disk, see [Operations](operations.md).
