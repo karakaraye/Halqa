@@ -1,6 +1,6 @@
 # Halqa — go-live checklist
 
-The software is complete and verified for a first release (see `VERIFICATION.md`). Everything below needs people, contracts or outside services, and must be done before real patients are served. Tick a line only when its evidence is on file. Names, dates and contacts are filled in by the operator.
+Use this checklist before serving real patients. The [verification record](../VERIFICATION.md) covers the software checks. Each item below needs a named owner, a date and the evidence listed in the table.
 
 ## Clinical
 

@@ -58,9 +58,10 @@ function migrate(db: DatabaseSync) {
 }
 
 const connections = new Map<string, DatabaseSync>();
+export const sqlitePath = () => resolve(process.env.HALQA_DB_PATH || 'data/halqa.sqlite');
 export function database() {
   if (process.env.VERCEL === '1') throw new Error('Halqa SQLite requires the durable API origin.');
-  const file = resolve(process.env.HALQA_DB_PATH || 'data/halqa.sqlite');
+  const file = sqlitePath();
   let db = connections.get(file);
   if (db) return db;
   mkdirSync(dirname(file), { recursive: true });

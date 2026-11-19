@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { HttpError, SESSION_HOURS, sameSecret, sessionFor } from './auth';
+import { withDemoStorage } from './demo-storage';
 export const COOKIE='halqa_session';
 /**
  * Cookies are Secure whenever HALQA_ORIGIN is an https address (the proxy may
@@ -7,7 +8,7 @@ export const COOKIE='halqa_session';
  * or when the request itself arrived over https.
  */
 export function secureCookies(request:NextRequest) {
-  const origin=process.env.HALQA_ORIGIN?.trim();
+  const origin=(process.env.HALQA_ORIGIN || process.env.RENDER_EXTERNAL_URL)?.trim();
   return origin ? /^https:/i.test(origin) : request.nextUrl.protocol==='https:';
 }
 const cookieBase=(request:NextRequest)=>({httpOnly:true,sameSite:'strict' as const,path:'/',secure:secureCookies(request)});
@@ -38,7 +39,7 @@ export function session(request:NextRequest,write=false,{duringPasswordChange=fa
   return found;
 }
 export function sameOrigin(request:NextRequest) {
-  const expected=process.env.HALQA_ORIGIN||request.nextUrl.origin;
+  const expected=process.env.HALQA_ORIGIN||process.env.RENDER_EXTERNAL_URL||request.nextUrl.origin;
   if(request.headers.get('origin')!==expected) throw new HttpError(403,'Request origin is not permitted.');
 }
 export async function body(request:NextRequest) {
@@ -46,7 +47,24 @@ export async function body(request:NextRequest) {
   if(Number(request.headers.get('content-length')||0)>32000) throw new HttpError(413,'Request is too large.');
   const reader=request.body?.getReader();if(!reader)throw new HttpError(400,'A JSON body is required.');
   const chunks:Uint8Array[]=[];let length=0;
-  while(true){const {done,value}=await reader.read();if(done)break;length+=value.byteLength;if(length>32000){await reader.cancel();throw new HttpError(413,'Request is too large.');}chunks.push(value);}
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new HttpError(408, 'The request body took too long.')), 5000);
+  });
+  try {
+    for (;;) {
+      const { done, value } = await Promise.race([reader.read(), deadline]);
+      if (done) break;
+      length += value.byteLength;
+      if (length > 32000) throw new HttpError(413, 'Request is too large.');
+      chunks.push(value);
+    }
+  } catch (error) {
+    void reader.cancel().catch(() => {});
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
   const raw=Buffer.concat(chunks).toString('utf8');
   try { return JSON.parse(raw); } catch { throw new HttpError(400,'Invalid JSON.'); }
 }
@@ -84,7 +102,7 @@ export function logLine(route:string,method:string,status:number,error?:string,d
 export function logged<A extends unknown[]>(route:string,handler:(request:NextRequest,...rest:A)=>Promise<NextResponse>|NextResponse) {
   return async (request:NextRequest,...rest:A):Promise<NextResponse> => {
     let response:NextResponse;
-    try { response=await handler(request,...rest); } catch(error) { response=failure(error); }
+    try { response=await withDemoStorage(() => handler(request,...rest)); } catch(error) { response=failure(error); }
     const error=response.headers.get(ERROR_HEADER)??undefined;
     const database=response.headers.get(DATABASE_HEADER)??undefined;
     response.headers.delete(ERROR_HEADER);

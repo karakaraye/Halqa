@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
  */
 export const GET = logged('/api/health', (request: NextRequest) => {
   try {
-    rateLimit(request, 'health');
+    if (!process.env.HALQA_DEMO_POSTGRES_URL) rateLimit(request, 'health');
     database().prepare('SELECT 1').get();
     return privateJson({ ok: true });
   } catch (error) {

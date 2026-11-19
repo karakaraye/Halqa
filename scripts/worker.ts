@@ -2,14 +2,22 @@ import { refreshEscalations } from '../src/server/workspace';
 import { deliverPending } from '../src/server/delivery';
 import { cleanup } from '../src/server/maintenance';
 import { closeDatabases } from '../src/server/db';
+import { withDemoStorage } from '../src/server/demo-storage';
 const failed=(task:string,error:unknown)=>console.error(`${task} could not complete:`,error instanceof Error?error.name:'Unknown error');
 let busy=false;
 const tick=async()=>{
   if(busy)return;busy=true;
-  try{refreshEscalations();}catch(error){failed('Escalation scan',error);}
-  try{await deliverPending();}catch(error){failed('Message delivery',error);}
-  try{cleanup();}catch(error){failed('Cleanup',error);}
-  busy=false;
+  try {
+    await withDemoStorage(async () => {
+      try{refreshEscalations();}catch(error){failed('Escalation scan',error);}
+      try{await deliverPending();}catch(error){failed('Message delivery',error);}
+      try{cleanup();}catch(error){failed('Cleanup',error);}
+    });
+  } catch (error) {
+    failed('Demo database synchronization', error);
+  } finally {
+    busy=false;
+  }
 };
 void tick();
 const timer=setInterval(()=>void tick(),15000);

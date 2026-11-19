@@ -1,6 +1,6 @@
 # Running Halqa
 
-This is for the person who hosts it. Everything here was written against the code in this repository. What was run, and when, is stated where it matters; anything not run says so.
+This guide covers the standard single-server installation. For a hosted walkthrough with synthetic records, see the [hackathon deployment guide](hackathon-deploy.md).
 
 ## Requirements
 
@@ -23,7 +23,7 @@ npm run setup -- --email lead@yourclinic.org --name "Lead Name" --org "Your Orga
 
 ## Configuration
 
-Set these in `.env.local` next to `package.json` (read by `npm start`, `npm run dev` and the scripts) or in the service's environment. `.env.example` has the same list with descriptions. None of these is a secret except the webhook token.
+Set these in `.env.local` next to `package.json` (read by `npm start`, `npm run dev` and the scripts) or in the service's environment. See [`.env.example`](../.env.example) for the template. Keep the webhook token and raw integration keys in your service's secret store.
 
 | Variable | What it does | Default |
 |---|---|---|
@@ -156,4 +156,4 @@ To go back, stop everything, restore the backup from step 1 and start the previo
 
 - One server, one SQLite file, one app process and one worker. Do not run several copies or put the file on a shared network disk or temporary storage: the sign-in limit, request limits and revision checks rely on one database file.
 - SQLite is in WAL mode with a 5-second wait for locks; writes on the read path (session activity) never wait and are skipped when the file is busy. `npm run load-check` measures one network of 2,000 cases with 50 polling staff clients; results of the runs made are in `VERIFICATION.md`. Run it on your own server before going live (`npm run build` first; `--duration 300` for five minutes).
-- To grow beyond one server, move the data layer in `src/server/db.ts` and the SQL in `src/server/*.ts` to a shared database (for example PostgreSQL), keeping the same tables and the migration steps in order, and run several app processes behind the proxy with one worker. This has not been built.
+- Scaling a clinical installation beyond one server would require migrating the operational data layer and its transactions to a shared database, then verifying the new deployment against production workloads.

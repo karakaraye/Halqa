@@ -13,13 +13,13 @@ Staff sign in using their clinic email address and password at the sign-in scree
 - First-time sign in: If your account has a temporary password, Halqa will ask you to set a new password before you continue. Passwords must be at least 12 characters long.
 - Password updates: You can update your password at any time with the **Password** button in the top bar.
 
-![Sign-in screen](design/compare/11-2-sign-in.png)
+![Sign-in screen](design/compare/11-2-sign-in-1440.png)
 
 ### Your Workspace and Role Tabs
 When you sign in, Halqa automatically opens your primary workspace:
-- **Care Navigators and Primary Care Doctors:** Open to **My work** (`command`).
-- **Specialists:** Open to **Referrals** (`specialist`).
-- **Clinic Leads:** Open to **Overview** (`impact`).
+- Care navigators and primary care doctors open **My work**.
+- Specialists open **Referrals**.
+- Clinic leads open **Overview**.
 
 Tabs are displayed clearly at the top:
 - **My work:** Action-ranked cases needing attention.
@@ -32,14 +32,10 @@ Tabs are displayed clearly at the top:
 
 ## 2. Care Navigator Guide
 
-Navigators guide patients through screening results, assist with understanding, arrange interpretation, and ensure no patient is lost to follow-up.
+Navigators explain screening results, check understanding, arrange interpretation, and follow up on delays.
 
 ### Reviewing Your Cases
-The **My work** dashboard organizes cases into clear operational priorities:
-- **Needs you now:** Patients requiring urgent outreach or unacknowledged screening results.
-- **Late:** Steps that have exceeded their recommended clinical interval.
-- **Waiting on other clinics:** Referrals awaiting specialist review.
-- **Ready to close:** Completed pathways awaiting final clinician sign-off.
+**My work** groups open cases by whether they need action now, are late or due soon, or are waiting for someone else. Open a case to see the next step, who owns it, and its due time.
 
 ![My work dashboard](design/compare/11-22-my-work-1440.png)
 
@@ -87,27 +83,20 @@ Primary care physicians provide clinical consultations, place specialist referra
 2. Enter the clinical reason for referral and any required priority.
 3. Confirm the referral. The case immediately appears in the receiving specialist's **Referrals** inbox.
 
-### Closing a Case with Verified Evidence
-Halqa strictly enforces evidence-based pathway closure. A case cannot be closed on a checkbox alone.
-1. Click **Close this case**.
-2. Complete the mandatory clinical close requirements:
-   - **Final clinical outcome:** Plain-language summary of findings (e.g. "Normal screening colonoscopy; routine re-screen in 10 years").
-   - **Verifiable evidence reference:** Specific lab report, imaging identifier, or pathology record (e.g. "Pathology Report #P-88210, City Hospital").
-   - **Follow-up care plan:** Clear schedule and instructions (e.g. "Return to routine national screening; primary care follow-up in 12 months").
-   - **Clinician name and professional licence number:** Your full name and verified licence identifier.
-3. Click **Confirm close**. The case is locked and archived into the permanent audit record.
+### Closing a Case with Evidence
+
+1. Click **Close case** and check the **Before you close** list.
+2. Enter what the test showed, the report reference, and the follow-up plan. Add a next screening date if applicable.
+3. Click **Close case** to record the decision. Halqa gets the clinician's name and licence from the signed-in account.
 
 ### Requesting an Exception Close
-If a patient declines further investigation or moves out of the catchment area:
-1. Select **Request exception close**.
-2. Provide the clinical reason and detailed evidence of counseling.
-3. Submit for review. The case moves to **Pending approval** and alerts the Clinic Lead.
+If the patient declined, received care elsewhere, or moved out of scope, choose the matching option under **How is this case ending?** Enter the outcome, evidence reference, plan and the reason for requesting closure without a test. Click **Close case** to send the request for a second check. The case stays open until the clinic lead approves it.
 
 ---
 
 ## 4. Specialist Guide
 
-Specialists review incoming referrals, schedule procedures, document outcomes, and return care plans to primary care.
+Specialists review incoming referrals, then record test results and care plans for the referring doctor.
 
 ### Reviewing Incoming Referrals
 1. Click the **Referrals** tab.
@@ -116,13 +105,14 @@ Specialists review incoming referrals, schedule procedures, document outcomes, a
 ![Specialist Referrals](design/compare/13-138-referrals-1440.png)
 
 3. Actions:
-   - **Accept referral:** Takes clinical custody of the consultation step and schedules the procedure.
-   - **Send back with guidance:** If the referral lacks required prerequisites or is directed to the incorrect specialty, click **Send back**, select the reason, enter clinical guidance for the referring doctor, and click **Confirm send-back**.
+   - **Accept** lets the care team book an appointment at the receiving service.
+   - **Ask for more information** sends the referring doctor a question.
+   - **Send back** returns the referral to the doctor with the selected reason.
 
 ### Documenting Attendance and Outcomes
 1. Record when the patient attends the specialist appointment.
 2. Document the procedure findings, outcome, and post-procedure care plan.
-3. Send the completed report back to the primary care physician for final pathway closure.
+3. Record the care plan in the case. The referring doctor can see the result and plan when reviewing closure.
 
 ---
 
@@ -131,11 +121,7 @@ Specialists review incoming referrals, schedule procedures, document outcomes, a
 Clinic Leads oversee programme performance, review exceptions, and manage staff accounts.
 
 ### Monitoring Clinic Overview
-The **Overview** dashboard provides real-time, tamper-proof tracking of all active screening pathways:
-- **Active pathways:** Count of ongoing cases across screening programmes.
-- **Median days to diagnostic resolution:** Time from abnormal screening result to confirmed clinical outcome.
-- **Timely follow-up rate:** Percentage of patients reaching specialist care within programme benchmarks.
-- **Closed with verified evidence:** Percentage of cases closed with verifiable diagnostic reports.
+The **Overview** dashboard shows the typical time to tell a patient their result, tests done on time, cases closed with test evidence, and patients who understood their result. The breakdown shows performance by programme and the most common recorded delays.
 
 ![Clinic Overview](design/compare/14-203-overview-1440.png)
 
@@ -144,7 +130,7 @@ To maintain clinical safety, exceptions cannot be closed by a single clinician.
 1. Open the **Approvals** tab.
 2. Review pending requests.
 3. Verify counseling notes and clinical reasoning.
-4. Select **Approve exception** or **Send back for further counseling**.
+4. Write a decision note and select **Approve** or **Send back to the doctor**.
 
 ![Approvals Screen](design/compare/14-296-approvals-1440.png)
 
@@ -174,24 +160,24 @@ A receiving service is a hospital unit or clinic that accepts referrals for one 
 
 ## 6. Patient Portal Guide
 
-The Halqa Patient Portal runs directly on patients' mobile phones (optimized for 320px and 390px screens). It is available in English, Arabic (`ar`), Hindi (`hi`), and Urdu (`ur`) with full right-to-left layout support.
+Patients can open the portal in a mobile browser. It is available in English, Arabic, Hindi and Urdu. Arabic and Urdu use a right-to-left layout.
 
 ### 1. Your Result (P1)
 - Clear, plain-language notification of their screening result.
 - Avoids medical jargon or alarming language.
-- One clear call to action: **Next step**.
+- Choose **Continue** to move to the quick check.
 
 ![Result Screen](design/compare/P1-result-390.png)
 
 ### 2. Quick Check (P2)
 - Helps patients confirm they understand what the result means before booking.
 - Two simple, supportive questions.
-- Confidence rating slider (1 to 5).
-- If a patient expresses low confidence, their care navigator is automatically alerted to provide proactive phone guidance.
+- Choose a confidence rating from 1 to 5.
+- An incorrect answer or low confidence alerts the navigator to follow up.
 
 ![Quick Check](design/compare/P2-quick-check-390.png)
 
-### 3. Your Steps & Booking (P3 & P4)
+### 3. Your Steps and Booking
 - Shows the patient what to expect next at each stage of their care.
 - Once the specialist has accepted the referral, the screen says "Your navigator will call you to book a time." The patient does not pick a time; the navigator or doctor enters the real appointment on the case page. When an appointment exists, the screen shows the day, time and place, with "Add to my calendar" and a way to ask for a change.
 - Automatically generates standard `.ics` calendar appointments with one click.

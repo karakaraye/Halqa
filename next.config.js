@@ -26,7 +26,7 @@ function securityHeaders() {
     { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
     { key: 'Cross-Origin-Resource-Policy', value: 'same-origin' },
   ];
-  if ((process.env.HALQA_ORIGIN || '').startsWith('https:')) {
+  if ((process.env.HALQA_ORIGIN || process.env.RENDER_EXTERNAL_URL || '').startsWith('https:')) {
     headers.push({ key: 'Strict-Transport-Security', value: 'max-age=31536000' });
   }
   return headers;

@@ -11,7 +11,7 @@ export function proxy(request: NextRequest) {
   const nonce = newNonce();
   const policy = pagePolicy(nonce, {
     development: process.env.NODE_ENV === 'development',
-    https: /^https:/i.test(process.env.HALQA_ORIGIN ?? ''),
+    https: /^https:/i.test(process.env.HALQA_ORIGIN || process.env.RENDER_EXTERNAL_URL || ''),
   });
   const headers = new Headers(request.headers);
   headers.set('content-security-policy', policy);

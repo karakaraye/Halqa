@@ -1,29 +1,20 @@
-# Deploy the synthetic demo on Vercel
+# Host the synthetic Halqa demo
 
-Use separate hosting for the UI and API. Vercel serves the Next.js pages and rewrites same-origin `/api/*` requests to one long-running Node 24 service. That service owns the SQLite database and runs the existing 15-second worker alongside the API. SQLite, its WAL, and its shared-memory file stay on the same persistent disk. Use a single instance and a dedicated demo disk.
+Deploy from `main`. A single Render web service runs the app and the existing worker. For the time-limited demo, free Render Postgres stores the SQLite database between starts. You can open the Render URL directly. A Vercel frontend can also forward requests to the same API.
 
-## Deploy
+## Render
 
-1. Push `codex/hackathon-vercel` to GitHub. Pick a stable HTTPS hostname for the demo. Use this exact scheme and hostname without a trailing slash for `HALQA_ORIGIN` on both services. If using a Vercel preview, use its stable branch alias and grant intended reviewers access to that alias.
-2. Run the branch on a Node web service with a persistent disk, such as a paid Render web service. Use Node 24, build with `npm ci --include=dev && npm run build`, start with `npm start`, and set the health check to `/api/health`. For a Render disk mounted at `/var/data`, set `HALQA_DB_PATH=/var/data/halqa.sqlite`. Set `NODE_ENV=production` and `HALQA_ORIGIN` in the service environment. The platform supplies `PORT`.
-3. On the API service, set `HALQA_INTAKE_KEY_SHA256` to the SHA-256 hex digest of a privately generated, high-entropy lab key. Keep the raw key in the caller's password manager or secret store. Leave the delivery key, outbound messaging variables, test controls, and proxy trust unset for this demo. With proxy trust unset the API uses the socket address for rate limits, so visitors may share a limit behind the proxy. The email sign-in limit still applies.
-4. In the Vercel project, select Next.js and Node 24. Set `HALQA_API_ORIGIN` to the API service's HTTPS origin and `HALQA_ORIGIN` to the demo origin in the Preview environment. Use `npm run build` and enable access to Vercel's system environment variables. Keep the database path and integration credentials on the API service. Deploy the branch through the Git integration or run `vercel deploy` from its checkout. If you chose a custom hostname, point it to this preview with `vercel alias set <deployment-url> <demo-hostname>`. Redeploy the UI when either origin changes. [Vercel preview deployment guide](https://vercel.com/docs/projects/deploy-from-cli)
+1. Create a **Free** Postgres database with external access blocked. Create a **Free** Node web service from the Halqa repository in the same region. Use Node 24, `npm ci --include=dev && npm run build` to build, `npm start` to launch, and `/api/health` for its health check.
+2. Set `HALQA_DEMO_REQUIRED=1`. Give the service the database’s **internal** URL as `HALQA_DEMO_POSTGRES_URL` and a randomly generated demo password of at least 24 characters as `HALQA_DEMO_SEED_PASSWORD`. Store both in the service’s secrets. Leave outbound messaging and test controls off. For API intake, set `HALQA_INTAKE_KEY_SHA256` to the SHA-256 hex digest of a new, high-entropy integration key. Keep the raw key private.
+3. Open the service’s public HTTPS URL. `/api/health` should return `{"ok":true}`. Sign in as `lead_fatima@halqa.test` with the demo password. On the first successful database operation, Halqa seeds synthetic cases and demo accounts. Existing accounts and their passwords are preserved across restarts.
+4. Send a synthetic [intake request](api.md#post-apiintakeresults) twice with the same external ID. Expect 201, then 200 with the same case ID. Restart the service and verify that case still opens and replay returns the same ID.
 
-The origin allowlist is exact. Open the configured hostname to sign in. Use a separate API instance and disk if another environment needs its own public hostname. The origin service serves the API over HTTPS and still enforces the same login, role, CSRF, and integration-key checks for incoming requests.
+A Postgres transaction serializes API operations and worker ticks across processes. The web process and worker each work from a temporary SQLite copy. Changes are saved as a single PostgreSQL snapshot before the API responds. Run this mode with one small synthetic workspace and the existing worker. The free service can sleep while idle, and the free database expires after 30 days. Keep real patient information out of this deployment. [Render free-tier limits](https://render.com/docs/free)
 
-## Seed and check
+## Vercel frontend
 
-Run the seed command once from the app directory in a private shell on the API service with the persistent disk mounted. Confirm `HALQA_DB_PATH` points to the dedicated, empty demo database and keep the printed credentials private.
+1. Use a Next.js project on Node 24, with `npm run build` and access to Vercel’s system environment variables.
+2. Choose an exact HTTPS hostname for the Vercel demo. Set `HALQA_ORIGIN` to that origin on **both** the Render API service and the Vercel deployment. On Vercel, also set `HALQA_API_ORIGIN` to the Render service’s HTTPS origin. Use origin URLs without trailing slashes.
+3. Deploy `main` in Vercel and open the configured hostname. Verify `/api/health`, sign in, and open a case. Once `HALQA_ORIGIN` is set to the Vercel hostname, use that hostname for browser sign-in. [Vercel deployment guide](https://vercel.com/docs/projects/deploy-from-cli)
 
-```sh
-env -u HALQA_ORIGIN NODE_ENV=development npm run seed:local
-```
-
-The command seeds synthetic cases and staff and patient accounts with random passwords. Its environment overrides apply only to the seed process. If the database already has accounts, seeding exits without resetting them.
-
-1. Open `/api/health` via the Vercel hostname and check for `{"ok":true}`.
-2. Sign in as `lead_fatima@halqa.test` using the password printed by the seed command. Check that a seeded case opens and that signing out works. Use a private window to verify that `/api/workspace` requires sign-in.
-3. Use the [intake example](api.md#post-apiintakeresults) with a fresh synthetic external ID, the current time in milliseconds, `pcpId: "pcp_mariam"`, and the raw intake key. Send it via the Vercel hostname. Expect 201, then 200 with the same case ID on repeat. The lead can create a patient account for this case.
-4. Restart the API service. Confirm that the case still opens and the same intake payload returns the same case ID. Keep the same disk across redeploys. Use the existing [backup procedure](operations.md) to copy a snapshot off the service if needed.
-
-The worker starts with `npm start` and handles escalation, outbox retries, and cleanup. Keep it in the same service as the API. Leave outbound messaging unset for synthetic phone numbers and record contact by phone in the demo UI.
+For a long-running installation with its own persistent SQLite disk, see [Operations](operations.md).
