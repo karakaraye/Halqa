@@ -2,6 +2,22 @@
 
 Halqa is a care coordination app for following up on actionable screening results. It gives each result a case, assigns the next step to a person, and shows the care team what is overdue. Patients can read their result once the team has made contact, answer a short understanding check, and see their appointment and next steps.
 
+## Hackathon demo
+
+[Open the live app](https://halqa-hackathon.vercel.app) · [Download the 2:50 walkthrough](https://raw.githubusercontent.com/karakaraye/Halqa/main/docs/demo/Halqa-Hackathon-Demo.mp4)
+
+Sign in with any of the accounts below. All five use the public demo password **`Password1234`**.
+
+| Role | Sign-in email | Where to start |
+|---|---|---|
+| Navigator | `nav_reem@halqa.test` | **My work** for case follow-up and patient contact |
+| Referring doctor | `pcp_mariam@halqa.test` | **My work** for consultations and referrals |
+| Specialist | `sp_tariq@halqa.test` | **Referrals** for the receiving service’s queue |
+| Patient | `patient_hq-1003@halqa.test` | **Your result** and **Your steps** for one synthetic case |
+| Clinic lead | `lead_fatima@halqa.test` | **Overview** and **Approvals** for programme review |
+
+Sign out between roles or use separate browser profiles to keep them open together. The demo uses shared synthetic cases. Account changes are disabled so reviewers can keep using the same logins. The backend may take a moment to start after being idle.
+
 ![Halqa case page showing the next action, the care team, and the case history](docs/design/compare/13-2-case-page-1440.png)
 
 ## How a case moves

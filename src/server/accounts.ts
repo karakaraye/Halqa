@@ -56,6 +56,7 @@ export function insertAccount(db: DatabaseSync, input: NewAccount, network: stri
 
 /** Creates an account with a temporary password that is returned once and never stored in clear. */
 export function createAccount(input: NewAccount, network: string, createdBy: string) {
+  protectPublicDemoAccounts();
   // Validate here as well as in the route, so every caller stores a normalised email.
   const parsed = newAccountSchema.safeParse(input);
   if (!parsed.success) throw new HttpError(422, 'Check the name, email, role and organisation.');
@@ -75,6 +76,7 @@ export function listAccounts(network: string): AccountSummary[] {
 
 /** Blocks sign-in for an account and ends its sessions. The record itself is kept for the audit trail. */
 export function disableAccount(id: string, network: string, disabledBy: string) {
+  protectPublicDemoAccounts();
   if (id === disabledBy) throw new HttpError(409, 'You cannot disable your own account.');
   transaction((db) => {
     const row = db.prepare('SELECT * FROM users WHERE id=? AND network=?').get(id, network) as UserRow | undefined;
@@ -98,6 +100,7 @@ export const passwordChangeSchema = z.object({
  * device that made the change.
  */
 export function changePassword(userId: string, input: unknown) {
+  protectPublicDemoAccounts();
   const parsed = passwordChangeSchema.safeParse(input);
   if (!parsed.success) throw new HttpError(422, 'The new password needs at least 12 characters.');
   const { currentPassword, newPassword } = parsed.data;
@@ -112,4 +115,10 @@ export function changePassword(userId: string, input: unknown) {
     recordEvent(db, userId, 'PASSWORD_CHANGED', {});
     return { ...issueSession(db, userId), user: { ...userFromRow(row), mustChangePassword: false } };
   });
+}
+
+export function protectPublicDemoAccounts() {
+  if (process.env.HALQA_DEMO_POSTGRES_URL && process.env.HALQA_PUBLIC_DEMO === '1') {
+    throw new HttpError(403, 'Account changes are disabled in the public demo.');
+  }
 }

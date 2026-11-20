@@ -10,10 +10,10 @@ let loadedRevision: string | undefined;
 let initialized = false;
 
 async function rotateSeedPassword() {
-  const previous = process.env.HALQA_DEMO_SEED_PASSWORD;
+  const previous = [process.env.HALQA_DEMO_PREVIOUS_PASSWORD, process.env.HALQA_DEMO_SEED_PASSWORD].filter(Boolean) as string[];
   const next = process.env.HALQA_DEMO_ROTATED_PASSWORD;
-  if (!previous || !next || previous === next) return;
-  if (next.length < 24) throw new Error('The replacement demo password must have at least 24 characters.');
+  if (!previous.length || !next) return;
+  if (next.length < 12) throw new Error('The replacement demo password must have at least 12 characters.');
   const marker = createHash('sha256').update(next).digest('hex');
   const { hashPassword, verifyPassword } = await import('./auth');
   transaction(db => {
@@ -22,7 +22,9 @@ async function rotateSeedPassword() {
     const accounts = db.prepare('SELECT id, password_hash FROM users').all() as { id: string; password_hash: string }[];
     const update = db.prepare('UPDATE users SET password_hash=? WHERE id=?');
     for (const account of accounts) {
-      if (verifyPassword(previous, account.password_hash)) update.run(hashPassword(next), account.id);
+      if (previous.some(password => password !== next && verifyPassword(password, account.password_hash))) {
+        update.run(hashPassword(next), account.id);
+      }
     }
     db.exec('DELETE FROM sessions');
     db.prepare("INSERT OR REPLACE INTO meta (key,value) VALUES ('demo_password_rotation',?)").run(marker);

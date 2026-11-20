@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { revokeAllSessions } from '@/server/auth';
+import { protectPublicDemoAccounts } from '@/server/accounts';
 import { clearSessionCookie, failure, logged, privateJson, session } from '@/server/http';
 
 export const runtime = 'nodejs';
@@ -13,6 +14,7 @@ export const dynamic = 'force-dynamic';
 export const POST = logged('/api/session/revoke-all', async (request: NextRequest) => {
   try {
     const s = session(request, true, { duringPasswordChange: true });
+    protectPublicDemoAccounts();
     const ended = revokeAllSessions(s.user.id);
     const response = privateJson({ ok: true, sessions: ended });
     clearSessionCookie(response, request);
