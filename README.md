@@ -1,128 +1,55 @@
 # Halqa
 
-Halqa is a care coordination app for following up on actionable screening results. It gives each result a case, assigns the next step to a person, and shows the care team what is overdue. Patients can read their result once the team has made contact, answer a short understanding check, and see their appointment and next steps.
+Halqa helps care teams follow an actionable screening result through to a documented outcome. It shows who owns the next step, what is overdue, what the patient has been told, and what evidence supports closing the case.
 
-## Hackathon demo
+**[Open the live Halqa demo](https://halqa-hackathon.vercel.app)** · **[Watch or download the 2:50 walkthrough](https://raw.githubusercontent.com/karakaraye/Halqa/main/docs/demo/Halqa-Hackathon-Demo.mp4)**
 
-[Open the live app](https://halqa-hackathon.vercel.app) · [Download the 2:50 walkthrough](https://raw.githubusercontent.com/karakaraye/Halqa/main/docs/demo/Halqa-Hackathon-Demo.mp4)
+## Sign in and explore
 
-Sign in with any of the accounts below. All five use the public demo password **`Password1234`**.
+All five accounts use the password **`Password1234`**. Open the live app, enter one of the emails below, and select **Sign in**.
 
-| Role | Sign-in email | Where to start |
+| Role | Email | What to try first |
 |---|---|---|
-| Navigator | `nav_reem@halqa.test` | **My work** for case follow-up and patient contact |
-| Referring doctor | `pcp_mariam@halqa.test` | **My work** for consultations and referrals |
-| Specialist | `sp_tariq@halqa.test` | **Referrals** for the receiving service’s queue |
-| Patient | `patient_hq-1003@halqa.test` | **Your result** and **Your steps** for one synthetic case |
-| Clinic lead | `lead_fatima@halqa.test` | **Overview** and **Approvals** for programme review |
+| Care navigator | `nav_reem@halqa.test` | Open **My work**, choose a case, and review who owns the next step. |
+| Primary care doctor | `pcp_mariam@halqa.test` | In **My work**, open a case to review the consultation, referral, and closure requirements. |
+| Receiving specialist | `sp_tariq@halqa.test` | Open **Referrals** to see what was sent and how the receiving team responds. |
+| Patient | `patient_hq-1003@halqa.test` | Open **Your result** and **Your steps** to see the patient’s view of one screening case. |
+| Clinic lead | `lead_fatima@halqa.test` | Start at **Overview** for programme activity, then open **Approvals** for any cases that need a second check. |
 
-Sign out between roles or use separate browser profiles to keep them open together. The demo uses shared synthetic cases. Account changes are disabled so reviewers can keep using the same logins. The backend may take a moment to start after being idle.
+Use **Sign out** before switching roles. To compare roles side by side, sign in from separate browser profiles. The site uses shared synthetic cases, so another reviewer’s actions can change what you see. Account changes are disabled to keep these logins available. The first load can take a moment if the demo has been idle.
 
-![Halqa case page showing the next action, the care team, and the case history](docs/design/compare/13-2-case-page-1440.png)
+## What Halqa solves
 
-## How a case moves
+A screening result can pass from a lab to a navigator, a referring doctor, a receiving service, and back to the patient. At each handoff, someone needs to know who acts next and whether that step actually happened. Halqa puts those decisions in one case timeline. It tracks patient contact, records the patient’s understanding, shows whether the receiving team accepted the referral, and requires evidence before a clinician closes the case.
 
-The diagram shows the specialist route used for bowel, breast, and cervical screening. The diabetes pathway has its own primary-care follow-up steps. Each programme’s steps and time targets are defined in [the pathway configuration](src/lib/pathways.ts).
+The demo includes colorectal FIT, breast imaging, cervical HPV, and diabetes HbA1c screening pathways. Each has its own follow-up steps and timing. The walkthrough follows a positive FIT result through specialist assessment.
 
-```mermaid
-flowchart TD
-    Intake["Lab sends a result"] --> Contact["Navigator contacts the patient"]
-    Contact --> Patient["Patient reads the result and completes a quick check"]
-    Patient --> Review["Doctor records the consultation and sends a referral"]
-    Review --> Specialist{"Receiving service accepts?"}
-    Specialist -->|"Sends it back with a reason"| Review
-    Specialist -->|"Accepts"| Booking["Care team books the appointment"]
-    Booking --> Outcome["Care team records attendance, result, and plan"]
-    Outcome --> Closure["Clinician signs the closure"]
-```
+## Follow the walkthrough
 
-- **Care navigators** record contact attempts, arrange bookings, and follow up on missed appointments or low understanding.
-- **Doctors** document consultations, refer to receiving services, and close cases with evidence.
-- **Specialists** accept or return referrals and document test outcomes and next steps.
-- **Clinic leads** monitor work across their network, review exception closures, and manage accounts and receiving services.
-- **Patients** see their own released result, appointments, and care steps. The portal has English, Arabic, Hindi, and Urdu copy, with a right-to-left layout for Arabic and Urdu.
+1. **Result arrives.** A synthetic lab result creates a case, assigns the care team, and gives the navigator a next action.
+2. **Patient is contacted.** The navigator records reaching the patient. The patient portal then shows the result, what it means, and a short check of the patient’s understanding.
+3. **Doctor refers and specialist responds.** The doctor documents the consultation and sends a referral to a receiving service. The specialist reviews it and can accept it or send it back with a reason.
+4. **Appointment and outcome are recorded.** The care team books the visit and records attendance. The specialist documents the test result and the follow-up plan. The patient sees booking and progress in **Your steps**.
+5. **Clinician closes the loop.** The doctor records the outcome, links the closure to supporting evidence, and confirms the plan. An exception closure without a test, such as when the patient declines, goes to the clinic lead for a second check.
 
-Regular closure requires a recorded result, a care plan, and evidence. An exception requires a documented reason and a decision by a different licensed clinic lead. Overdue work is escalated to staff for action.
+The video follows one case from intake to completion. The live app includes cases at different stages, and the patient login opens its own linked case. To explore a particular handoff, choose a case at that stage and look for its timeline under **What has happened**.
 
-[Role-by-role user guide](docs/user-guide.md) · [Patient portal screenshot](docs/design/compare/P1-result-390.png)
+![Halqa case page with the next action, care team, and case history](docs/design/compare/13-2-case-page-1440.png)
 
-## Run the demo locally
+## What to look for in the live app
 
-Install **Node.js 24 or newer** and Git. The app uses Node’s built-in SQLite module and needs a writable local directory.
+| Review question | Where to look |
+|---|---|
+| Who owns the next step? | Open a staff case. The case header and care-team panel show who is responsible, and the timeline shows what has happened. |
+| What does the patient understand and see? | Sign in as the patient. Compare **Your result**, **Your steps**, and **Help** with what staff see on the case timeline. |
+| Did the referral reach the receiving service? | Compare the doctor’s case timeline with **Referrals** in the specialist account. A returned referral includes a reason for the referring team. |
+| What evidence supports closure? | Open a care-team case near closure and review the outcome, evidence reference, plan, and recorded decision. |
+| How does the lead review the programme? | Use **Overview** to review progress and **Approvals** to see any pending exception closures. |
 
-```sh
-git clone https://github.com/karakaraye/Halqa.git
-cd Halqa
-npm ci
-```
+The patient portal offers English, Arabic, Hindi, and Urdu, with a right-to-left layout for Arabic and Urdu. The live demo is for evaluation with synthetic data. Use fictional names and contact details if adding anything during review.
 
-Seed an empty database with synthetic cases and accounts, then launch the app and worker.
+## More about Halqa
 
-**PowerShell**
-
-```powershell
-$env:HALQA_DB_PATH = 'data/demo/halqa.sqlite'
-npm run seed:local
-npm run dev
-```
-
-**Bash**
-
-```bash
-export HALQA_DB_PATH=data/demo/halqa.sqlite
-npm run seed:local
-npm run dev
-```
-
-Open [localhost:3000](http://localhost:3000). The seed prints the account details once. Sign in as `nav_reem@halqa.test` to open **My work**, or as `lead_fatima@halqa.test` to view **Overview**, **Approvals**, and **Accounts**. The terminal also lists patient accounts linked to individual seeded cases. The browser suite drives a complete synthetic result from intake through closure in [the shared-workflow test](e2e/shared-workflow.spec.ts).
-
-For an empty installation with just one clinic lead, point `HALQA_DB_PATH` at a fresh file and run:
-
-```sh
-npm run setup -- --email lead@example.org --name "Clinic Lead" --org "Example Clinic"
-npm run dev
-```
-
-`setup` prints a temporary password. The lead chooses a new one at first sign-in and can then add accounts and receiving services.
-
-## How the app is organised
-
-Halqa uses Next.js, React, and TypeScript. The staff workspace and patient portal use the same backend. The server checks a user’s role and case access, then applies permitted changes and records them in the audit history. The worker scans for overdue steps, handles queued messages when a provider is configured, and cleans up expired records.
-
-| Directory | Contents |
-| --- | --- |
-| [`src/app/`](src/app) | Next.js pages and HTTP route handlers |
-| [`src/components/`](src/components) | Staff workspace, patient portal, and shared interface components |
-| [`src/domain/`](src/domain) | Workflow, closure, intake, directory, and patient understanding rules |
-| [`src/lib/`](src/lib) | Pathway definitions, scheduling engine, translations, and synthetic fixtures |
-| [`src/server/`](src/server) | SQLite, sessions, permissions, workspace updates, and integrations |
-| [`scripts/`](scripts) | App launcher, worker, setup, backup, export, and load check |
-| [`tests/`](tests) and [`e2e/`](e2e) | Unit and integration tests, plus browser workflows |
-| [`docs/`](docs/README.md) | Product, architecture, interface, and operations documentation |
-
-For integrations, the laboratory posts to `POST /api/intake/results`. Resending the same external result ID in the same network returns the existing case. Message providers use a separate key and report delivery to `POST /api/intake/delivery`. Until a message is delivered or staff record successful contact, the patient’s result stays in the waiting state. [API reference](docs/api.md)
-
-## Verify changes
-
-```sh
-npm run typecheck
-npm run lint
-npm test
-npm run secrets-scan
-npm run build
-npx playwright install chromium
-npm run test:e2e
-```
-
-Playwright starts the built app on port 3001 by default and creates a separate test database. Set `HALQA_E2E_PORT` if that port is in use. For dated test results and screenshot comparisons, see [verification](VERIFICATION.md).
-
-Keep role checks and clinical rules on the server when changing a workflow. For screen changes, run the relevant browser tests at desktop and phone widths. Keep databases, credentials, local environment files, and generated test output out of Git.
-
-## Deployment and operations
-
-- [Hackathon deployment](docs/hackathon-deploy.md) covers the hosted setup for synthetic data.
-- [Operations](docs/operations.md) covers configuration, setup, backups, restore, and monitoring. Available environment variables are documented in [`.env.example`](.env.example).
-- [Security](docs/security.md) and [data protection](docs/data-protection.md) cover access controls, incident reporting, retention, and exports. Report security concerns privately to the operator of the installation.
-- [Go-live checklist](docs/go-live-checklist.md) covers the clinical approvals, translation review, privacy review, and operational checks required before using real patient data.
-
-For the full system and interface references, see the [documentation index](docs/README.md).
+- [Product overview](docs/product-overview.md) explains the problem, what Halqa covers, and what a pilot would measure.
+- [Role-by-role user guide](docs/user-guide.md) explains what to look for on each screen.
+- [Video file in this repository](docs/demo/Halqa-Hackathon-Demo.mp4) is available if the direct download does not open in your browser.
